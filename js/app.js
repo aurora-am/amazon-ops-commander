@@ -2,6 +2,17 @@
   const U=window.UI, DB=window.DB;
 
   const MENU=[
+    {g:'总览工具',items:[
+      {k:'dashboard',t:'店铺总览'},
+      {k:'risk',t:'风险清单'},
+      {k:'diagnosis',t:'诊断中心'},
+      {k:'tasks',t:'待办事项'},
+      {k:'patrol',t:'每日巡店'},
+      {k:'stores',t:'店铺与站点'},
+      {k:'toolbox',t:'工具箱',star:1},
+      {k:'data',t:'数据与备份'},
+      {k:'settings',t:'设置与阈值'}
+    ]},
     {g:'选品开发',items:[
       {k:'selection',t:'选品立项'},
       {k:'competitors',t:'竞品调研'},
@@ -12,7 +23,6 @@
       {k:'listing',t:'Listing 优化'},
       {k:'ads',t:'广告管理'},
       {k:'newlaunch',t:'新品推广节奏',star:1},
-      {k:'promos',t:'促销台账'},
       {k:'peak',t:'大促时间表'}
     ]},
     {g:'库存管理',items:[
@@ -25,7 +35,6 @@
       {k:'returns',t:'退货与索赔'},
       {k:'appeal',t:'申诉模板',star:1},
       {k:'reply',t:'回复模板',star:1},
-      {k:'influencer',t:'站外红人',star:1},
       {k:'compliance',t:'合规中心'}
     ]},
     {g:'财务绩效',items:[
@@ -33,18 +42,6 @@
       {k:'kpi',t:'每日数据'},
       {k:'kpiscore',t:'KPI 绩效',star:1},
       {k:'team',t:'团队管理',star:1}
-    ]},
-    {g:'总览工具',items:[
-      {k:'dashboard',t:'店铺总览'},
-      {k:'risk',t:'风险清单'},
-      {k:'diagnosis',t:'诊断中心'},
-      {k:'tasks',t:'待办事项'},
-      {k:'patrol',t:'每日巡店'},
-      {k:'stores',t:'店铺与站点'},
-      {k:'toolbox',t:'工具箱',star:1},
-      {k:'imports',t:'数据导入'},
-      {k:'data',t:'数据与备份'},
-      {k:'settings',t:'设置与阈值'}
     ]}
   ];
   const TITLES={}; MENU.forEach(g=>g.items.forEach(i=>TITLES[i.k]=i.t));
@@ -65,12 +62,27 @@
     async refresh(){ await App.render(location.hash.replace('#/','')||'dashboard') }
   };
 
+  const navOpen=new Set();
   function renderNav(active){
     const nav=document.querySelector('#nav');
-    nav.innerHTML=MENU.map(g=>`<div class="nav-group">${g.g}</div>`+
-      g.items.map(i=>`<div class="nav-item ${i.k===active?'active':''}" data-k="${i.k}">
-        <span>${i.t}</span>${i.star?'<span class="dot d-yellow" title="差异化模块"></span>':''}</div>`).join('')
-    ).join('');
+    const activeG=MENU.find(g=>g.items.some(i=>i.k===active));
+    if(activeG) navOpen.add(activeG.g);
+    nav.innerHTML=MENU.map(g=>{
+      const open=navOpen.has(g.g)?'open':'';
+      return `<div class="nav-sec ${open}" data-g="${g.g}">
+        <div class="nav-group"><span class="ng-label">${g.g}</span><span class="caret">▸</span></div>
+        <div class="nav-sub">`+
+        g.items.map(i=>`<div class="nav-item ${i.k===active?'active':''}" data-k="${i.k}">
+          <span>${i.t}</span>${i.star?'<span class="dot d-yellow" title="差异化模块"></span>':''}</div>`).join('')+
+        `</div></div>`;
+    }).join('');
+    nav.querySelectorAll('.nav-group').forEach(el=>{
+      el.onclick=()=>{
+        const sec=el.closest('.nav-sec'); const key=sec.dataset.g;
+        if(navOpen.has(key)) navOpen.delete(key); else navOpen.add(key);
+        sec.classList.toggle('open');
+      };
+    });
     nav.querySelectorAll('[data-k]').forEach(el=>el.onclick=()=>{
       App.go(el.dataset.k);
       document.querySelector('#sidebar').classList.remove('open');
