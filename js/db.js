@@ -149,7 +149,7 @@
       ];
       pids=[];
       for(const p of prods){ const id=await DB.put('products',p); pids.push({id,...p}); }
-      for(let i=29;i>=0;i--){
+      for(let i=364;i>=0;i--){
         pids.forEach((p,idx)=>{
           const d=new Date(today); d.setDate(d.getDate()-i);
           const base=[42,30,18,12][idx];
@@ -391,10 +391,10 @@
         note:'报价偏高，等 Q4 预算'}
     ]);
     await fillTable('finance',()=>{
-      const base=[{m:5,rev:38200,cost:14200,hf:6200,comm:5730,fba:8600,ad:9100,rf:2300},
-        {m:6,rev:45100,cost:16800,hf:7300,comm:6765,fba:10100,ad:10800,rf:2600},
-        {m:7,rev:52300,cost:19400,hf:8200,comm:7845,fba:11700,ad:12600,rf:3100},
-        {m:8,rev:48900,cost:18200,hf:7900,comm:7335,fba:11000,ad:11900,rf:2800}];
+      const base=[{m:5,rev:38200,cost:2030,hf:886,comm:5730,fba:8600,ad:9100,rf:2300},
+        {m:6,rev:45100,cost:2400,hf:1043,comm:6765,fba:10100,ad:10800,rf:2600},
+        {m:7,rev:52300,cost:2770,hf:1171,comm:7845,fba:11700,ad:12600,rf:3100},
+        {m:8,rev:48900,cost:2600,hf:1129,comm:7335,fba:11000,ad:11900,rf:2800}];
       const y=today.getFullYear();
       return base.map(b=>({year:y,month:b.m,revenue:b.rev,productCost:b.cost,headFreight:b.hf,
         commission:b.comm,fbaFee:b.fba,adSpend:b.ad,refunds:b.rf,

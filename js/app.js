@@ -48,7 +48,7 @@
 
   const App={
     state:{},
-    filters:{from:'',to:'',site:'ALL',storeIds:[]},
+    filters:(()=>{const t=U.today(); return {from:U.addDays(t,-364),to:t,site:'ALL',storeIds:[]}})(),
     inScope(storeId){
       const f=App.filters;
       if(f.storeIds&&f.storeIds.length) return f.storeIds.indexOf(storeId)>=0;
@@ -99,9 +99,9 @@
     box.textContent=label;
     box.onclick=()=>{
       U.modal({title:'选择店铺（可多选）',
-        body:`<div style="font-size:13px;line-height:2">`+stores.map(s=>
-          `<label style="display:block"><input type="checkbox" value="${s.id}" ${sel.indexOf(s.id)>=0?'checked':''}> ${U.esc(s.name)}</label>`).join('')+
-          `</div><div style="margin-top:10px"><button class="btn-ghost" id="selAll">全选/清空</button></div>`,
+        body:`<div class="store-picker">`+stores.map(s=>
+          `<label class="store-picker-item"><input type="checkbox" value="${s.id}" ${sel.indexOf(s.id)>=0?'checked':''}><span>${U.esc(s.name)}</span></label>`).join('')+
+          `</div><div style="margin-top:10px;text-align:right"><button class="btn-ghost" id="selAll">全选/清空</button></div>`,
         okText:'应用',
         onOk:b=>{
           const ids=[]; b.querySelectorAll('input[type=checkbox]').forEach(c=>{if(c.checked)ids.push(Number(c.value))});
@@ -153,7 +153,8 @@
     document.querySelector('#fTo').onchange=e=>{App.filters.to=e.target.value;App.refresh()};
     document.querySelector('#fSite').onchange=e=>{App.filters.site=e.target.value;App.refresh()};
     document.querySelector('#btnResetFilter').onclick=()=>{
-      App.filters={from:'',to:'',site:'ALL',storeIds:[]};
+      const t=U.today();
+      App.filters={from:U.addDays(t,-364),to:t,site:'ALL',storeIds:[]};
       localStorage.setItem('cmdr_stores','[]');
       renderStorePicker(); App.refresh();
     };

@@ -337,13 +337,13 @@
     const costFields=[
       {k:'name',t:'产品名称'},{k:'sku',t:'SKU'},
       {k:'price',t:'售价($)',type:'number',step:'0.01'},
-      {k:'purchase',t:'采购成本(￥)',type:'number',step:'0.1'},
-      {k:'firstLeg',t:'头程(￥)',type:'number',step:'0.1'},
+      {k:'purchase',t:'采购成本($)',type:'number',step:'0.1'},
+      {k:'firstLeg',t:'头程($)',type:'number',step:'0.1'},
       {k:'fbaFee',t:'FBA配送费($)',type:'number',step:'0.1'},
-      {k:'commission',t:'佣金率',type:'number',step:'0.01',def:0.15},
-      {k:'storage',t:'仓储($)',type:'number',step:'0.1'},
-      {k:'returnLoss',t:'退货率',type:'number',step:'0.01',def:0.05},
-      {k:'targetAcos',t:'目标ACOS',type:'number',step:'0.01',def:0.25}
+      {k:'commission',t:'佣金率(0-1)',type:'number',step:'0.01',def:0.15},
+      {k:'storage',t:'仓储费($)',type:'number',step:'0.1'},
+      {k:'returnLoss',t:'退货损耗率(0-1)',type:'number',step:'0.01',def:0.05},
+      {k:'targetAcos',t:'目标ACOS(0-1)',type:'number',step:'0.01',def:0.25}
     ];
     const cols=[{t:'产品',k:'name'},{t:'SKU',k:'sku'},{t:'售价',k:'price',num:1,f:U.money},
       {t:'净利',k:'x',num:1,f:(v,r)=>U.money(r._net)},
@@ -355,7 +355,7 @@
         rows:ps.map(p=>{const r=U.profit(p);return Object.assign({},p,{_net:r.net,_margin:r.margin,_be:r.breakEvenAcos})}),
         actions:r=>`<button class="btn-ghost btn-sm" data-e="${r.id}">编辑成本</button><button class="btn-ghost btn-sm" data-d="${r.id}">删</button>`});
     };
-    root.innerHTML=`${U.card('利润测算','逐 SKU 测算 FBA 净利、净利率与保本 ACOS；成本结构录入一次，广告 / 诊断 / 定价页共用此口径','')}
+    root.innerHTML=`${U.card('利润测算','逐 SKU 测算 FBA 净利、净利率与保本 ACOS；成本结构录入一次，广告 / 诊断 / 定价页共用此口径；本页金额为统一美元口径，人民币成本请先换算','')}
       <div class="toolbar"><button class="btn" id="add">+ 新增产品</button><button class="btn-ghost" id="exp">导出 CSV</button></div><div id="t"></div>`;
     await draw();
     root.querySelector('#add').onclick=()=>U.modal({title:'新增产品',body:U.formFields(costFields),
@@ -372,8 +372,8 @@
 
   P.finance=async root=>{
     const cols=[{t:'年月',k:'ym',f:(v,r)=>r.year+'-'+String(r.month).padStart(2,'0')},
-      {t:'收入$',k:'revenue',num:1,f:U.money},{t:'产品成本￥',k:'productCost',num:1,f:U.money},
-      {t:'头程￥',k:'headFreight',num:1,f:U.money},{t:'佣金$',k:'commission',num:1,f:U.money},
+      {t:'收入$',k:'revenue',num:1,f:U.money},{t:'产品成本$',k:'productCost',num:1,f:U.money},
+      {t:'头程$',k:'headFreight',num:1,f:U.money},{t:'佣金$',k:'commission',num:1,f:U.money},
       {t:'FBA$',k:'fbaFee',num:1,f:U.money},{t:'广告$',k:'adSpend',num:1,f:U.money},
       {t:'退款$',k:'refunds',num:1,f:U.money},{t:'净利$',k:'netProfit',num:1,f:v=>U.tag(U.money(v),v>=0?'green':'red')}];
     const fields=[{k:'year',t:'年',type:'number'},{k:'month',t:'月',type:'number'},{k:'revenue',t:'收入$',type:'number'},

@@ -111,14 +111,17 @@
   P.stores=async root=>{
     const stores=await DB.all('stores');
     const prods=await DB.all('products');
+    const ahs=await DB.all('account_health');
+    const ahm={}; ahs.forEach(a=>ahm[a.storeId]=a);
     root.innerHTML=`<div class="card"><h3>店铺与站点</h3>
       <div class="sub">多店铺、多站点（US/EU/JP）统一管理；删除店铺不会自动删除产品，请谨慎</div>
       <div class="toolbar"><button class="btn" id="sAdd">新增店铺</button></div>`+
       U.table({cols:[
         {t:'店铺',k:'name'},{t:'站点',k:'site'},{t:'站点域名',k:'marketplace'},
         {t:'状态',k:'status',f:r=>r.status==='正常'?U.tag('正常','green'):U.tag(r.status||'—','red')},
-        {t:'ACH',k:'ach',num:true,f:r=>r.ach==null?'—':U.esc(r.ach)},
-        {t:'绩效通知',k:'notices',num:true,f:r=>r.notices==null?'—':U.esc(r.notices)},
+        {t:'AHR',num:true,f:r=>{const a=ahm[r.id];return a&&a.ahr!=null?U.esc(a.ahr):'—'}},
+        {t:'绩效通知',num:true,f:r=>{const a=ahm[r.id];return a&&a.policyWarnings!=null?U.esc(a.policyWarnings):'—'}},
+        {t:'停售ASIN',num:true,f:r=>{const a=ahm[r.id];return a&&a.suppressed!=null?U.esc(a.suppressed):'—'}},
         {t:'SKU 数',f:r=>String(prods.filter(p=>p.storeId===r.id).length)},
         {t:'备注',k:'note'}
       ],rows:stores,empty:'暂无店铺',
@@ -678,8 +681,8 @@
   /* ============ 新增 SOP 页面：库存/售后/推广 ============ */
   P.purchase=async root=>{
     const cols=[{t:'供应商',k:'supplier'},{t:'SKU',k:'sku'},{t:'产品',k:'productName'},
-      {t:'数量',k:'qty',num:1},{t:'单价￥',k:'unitPrice',num:1,f:U.money},
-      {t:'金额￥',k:'amount',num:1,f:U.money},{t:'下单日',k:'orderDate'},{t:'预计到货',k:'etaDate'},
+      {t:'数量',k:'qty',num:1},{t:'单价￥',k:'unitPrice',num:1,f:v=>U.money(v,'￥')},
+      {t:'金额￥',k:'amount',num:1,f:v=>U.money(v,'￥')},{t:'下单日',k:'orderDate'},{t:'预计到货',k:'etaDate'},
       {t:'状态',k:'status',f:v=>U.tag(v,v==='已到货'?'green':(v==='在途'?'yellow':'gray'))}];
     const fields=[{k:'supplier',t:'供应商'},{k:'sku',t:'SKU'},{k:'productName',t:'产品名称'},
       {k:'qty',t:'数量',type:'number'},{k:'unitPrice',t:'单价(￥)',type:'number',step:'0.1'},
