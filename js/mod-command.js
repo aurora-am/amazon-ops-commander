@@ -70,12 +70,13 @@
       const d=U.diffDays(n.deadline,U.today());
       if(d<0){ if(d>=-30) out.push({level:'gray',type:'节点',storeId:null,expired:true,countdown:d,
         text:`${n.site} ${n.eventName} · ${n.type} 已逾期 ${(-d)} 天（截止 ${n.deadline}）`,link:'peak',key:`节点|EXP|${n.id}`}); return; }
-      out.push({level:d<=r.nodeRedDays?'red':'yellow',type:'节点',storeId:null,countdown:d,
+      if(d<=r.nodeYellowDays) out.push({level:d<=r.nodeRedDays?'red':'yellow',type:'节点',storeId:null,countdown:d,
         text:`${n.site} ${n.eventName} · ${n.type} 截止 ${n.deadline}（剩 ${d} 天）`,link:'peak',key:`节点|DUE|${n.id}`});
     });
     const order={red:0,yellow:1,gray:2};
     const typeOrder={合规:0,账户:1,库存:2,利润:3,广告:4,节点:5};
-    out.sort((a,b)=>(order[a.level]-order[b.level])||((typeOrder[a.type]||9)-(typeOrder[b.type]||9))
+    const to=t=>t!=null?typeOrder[t]:9;
+    out.sort((a,b)=>(order[a.level]-order[b.level])||(to(a.type)-to(b.type))
       ||(a.countdown==null?1:(b.countdown==null?-1:a.countdown-b.countdown)));
     return out;
   }
