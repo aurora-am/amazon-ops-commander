@@ -144,6 +144,8 @@
         ? `<textarea name="${f.k}" placeholder="${esc(f.ph||'')}">${esc(v)}</textarea>`
         : f.type==='select'
         ? `<select name="${f.k}">${f.opts.map(o=>`<option value="${esc(o.v)}" ${String(o.v)===String(v)?'selected':''}>${esc(o.t)}</option>`).join('')}</select>`
+        : f.readonly
+        ? `<input readonly class="formula-ro" name="${f.k}" value="${esc(v)}" placeholder="${esc(f.ph||'自动计算')}">`
         : `<input name="${f.k}" type="${f.type||'text'}" value="${esc(v)}" placeholder="${esc(f.ph||'')}" ${f.step?'step="'+f.step+'"':''}>`;
       return `<label class="f">${esc(f.t)}<div style="margin-top:4px">${inp}</div></label>`;
     }).join('')+`</div>`;
@@ -201,7 +203,94 @@
     return lines.slice(1).map(l=>{const v=split(l);const o={};head.forEach((h,i)=>o[h]=v[i]);return o});
   }
 
+  /* ---------- 选品开发模块：Tab / 子标签 / 分区卡 / 图片 / 导出 / 公式（Phase 3） ---------- */
+  function tabs(tabs){
+    return `<div class="tabs">`+tabs.map((t,i)=>
+      `<div class="tab ${i===0?'active':''}" data-k="${esc(t.key)}">${esc(t.label)}</div>`
+    ).join('')+`</div>`;
+  }
+  function bindTabs(root,tabs,bodyEl,onSwitch){
+    root.querySelectorAll('.tab').forEach(el=>{
+      el.onclick=()=>{
+        root.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+        el.classList.add('active');
+        onSwitch(tabs, el.dataset.k, bodyEl);
+      };
+    });
+  }
+  function subTabs(sheets){
+    return `<div class="sub-tabs">`+sheets.map((s,i)=>
+      `<div class="sub-tab ${i===0?'active':''}" data-k="${esc(s.key)}">${esc(s.label)}</div>`
+    ).join('')+`</div><div class="sub-body"></div>`;
+  }
+  function bindSubTabs(root,sheets,bodyEl,onSwitch){
+    root.querySelectorAll('.sub-tab').forEach(el=>{
+      el.onclick=()=>{
+        root.querySelectorAll('.sub-tab').forEach(x=>x.classList.remove('active'));
+        el.classList.add('active');
+        onSwitch(sheets, el.dataset.k, bodyEl);
+      };
+    });
+  }
+  function sectionCard(title,body){
+    return `<div class="section-card"><h4>${esc(title)}</h4>${body}</div>`;
+  }
+  function imgField(url){
+    const has=!!(url&&String(url).trim());
+    return `<div class="img-field">`+
+      `<img src="${has?esc(url):''}" alt="" ${has?'':'style="visibility:hidden"'}`+
+      ` onerror="this.style.visibility='hidden'">`+
+      `<span class="muted">${has?esc(url):'（无图，录入图片 URL）'}</span></div>`;
+  }
+  function exportXLSX(filename, sheets){
+    if(!window.XLSX){ toast('SheetJS 未加载，仅可导出 CSV'); return; }
+    const wb=XLSX.utils.book_new();
+    (sheets||[]).forEach(s=>{
+      const aoa=[s.headers.map(h=>h.label)];
+      (s.rows||[]).forEach(r=>aoa.push(s.headers.map(h=>r[h.key])));
+      const ws=XLSX.utils.aoa_to_sheet(aoa);
+      XLSX.utils.book_append_sheet(wb, ws, String(s.name||'Sheet').slice(0,31));
+    });
+    XLSX.writeFile(wb, filename.endsWith('.xlsx')?filename:(filename+'.xlsx'));
+  }
+  /* 母口径利润公式 2.0（B2）：显式金额字段 + 记录级汇率，与 U.profit 并存 */
+  function profitV2(rec){
+    const n=(v,d)=>{const x=Number(v);return isFinite(x)?x:(d===undefined?0:d);};
+    const price=n(rec.price), purchase=n(rec.purchase), firstLeg=n(rec.firstLeg),
+      fbaFee=n(rec.fbaFee), commission=n(rec.commission), refund=n(rec.refund),
+      ad=n(rec.ad), storageOther=n(rec.storageOther), promo=n(rec.promo);
+    const cost=purchase+firstLeg+fbaFee+commission+refund+ad+storageOther+promo;
+    const profit=price-cost;
+    const rate=n(rec.rate, 6.8);
+    const netPct=price?profit/price*100:null;
+    const profitRmb=profit*rate;
+    const breakEvenAcos=price?
+      (price-(purchase+firstLeg+fbaFee+commission+refund+storageOther+promo))/price*100:null;
+    return {cost$,cost,profit$,profit,netPct,profitRmb,breakEvenAcos};
+  }
+  /* B3：用户可维护 FBA 费率表 —— 仅示例行，真实 202509 费率待用户替换 */
+  const FBA_RATES = {
+    // TODO: 待用户提供 202509 版 FBA 费率表后替换/补充（标准/大件/超大件 × 尺寸分段 × 配送费）。
+    // 以下 example 行为占位，非真实费率，禁止当作默认值使用。
+    '标准': { note:'示例，待替换', example_fee: null /* TODO: byWeight:[{maxLb,fee}] */ },
+    '大件': { note:'示例，待替换', example_fee: null },
+    '超大件': { note:'示例，待替换', example_fee: null }
+  };
+  function fbaFee(tier, weight){
+    const t=FBA_RATES[tier];
+    if(!t) return null;
+    // TODO: 按真实 202509 费率分段查表；当前返回示例占位
+    if(Array.isArray(t.byWeight)){
+      for(const seg of t.byWeight){ if(Number(weight)<=seg.maxLb) return seg.fee; }
+    }
+    return (t.example_fee!=null)?t.example_fee:null;
+  }
+  /* B6：头程抛重（÷div 取大） */
+  function volWeight(l,w,h,div){ div=div||6000; const x=Number(l)*Number(w)*Number(h)/Number(div); return isFinite(x)?x:0; }
+  function chargeableWeight(real, vol){ return Math.max(Number(real)||0, Number(vol)||0); }
+
   window.UI={$,esc,num,f0,f2,money,pct,today,dstr,addDays,diffDays,R,setRules,profit,marginColor,tag,dot,
     sevTag,severityOf,card,kpi,table,empty,statBar,alertItem,toast,modal,confirmBox,formFields,formValues,chart,clearCharts,
-    toCSV,download,exportCSV,parseCSV};
+    toCSV,download,exportCSV,parseCSV,
+    tabs,bindTabs,subTabs,bindSubTabs,sectionCard,imgField,exportXLSX,profitV2,fbaFee,volWeight,chargeableWeight};
 })();

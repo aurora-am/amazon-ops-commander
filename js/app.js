@@ -14,9 +14,9 @@
       {k:'settings',t:'设置与阈值'}
     ]},
     {g:'选品开发',items:[
-      {k:'selection',t:'选品立项'},
-      {k:'competitors',t:'竞品调研'},
-      {k:'profit',t:'利润测算',star:1}
+      {k:'dev-selection',t:'选品立项&市场调研'},
+      {k:'dev-competitor',t:'竞品深度分析'},
+      {k:'dev-profit',t:'利润测算&产品开发',star:1}
     ]},
     {g:'推广运营',items:[
       {k:'keywords',t:'关键词词库'},

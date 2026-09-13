@@ -1,11 +1,14 @@
 (function(){
   const DB_NAME='commander_db';
-  const DB_VER=4;
+  const DB_VER=5;
   const TABLES=['stores','products','kpi_daily','listings','reviews','ads','searchterms',
     'inventory','ship_plans','returns','claims','promos','compliance','nodes','tasks',
     'diagnosis_log','competitors','keywords','candidates','patrol','settings','snapshots',
     'newlaunch','purchase','logistics','qc','appeal','reply','influencer','finance',
-    'kpi_score','team','toolbox','account_health'];
+    'kpi_score','team','toolbox','account_health',
+    'project_progress','market_analysis','aba_keywords','research',
+    'competitor_basic','competitor_multi','competitor_plan',
+    'profit_check','profit_metrics','product_analysis','dev_plan','fba_rate'];
 
   let _db=null;
   function open(){
@@ -33,7 +36,18 @@
   const DB={
     all:store=>tx(store,'readonly').then(os=>req(os.getAll())),
     get:(store,id)=>tx(store,'readonly').then(os=>req(os.get(id))),
-    put:(store,obj)=>tx(store,'readwrite').then(os=>req(os.put(obj))),
+    put:(store,obj)=>{
+      // B4 防御：拒绝写入含刷单/测评中介语义字段的对象（仅校验键名，不影响正常业务字段）
+      if(obj&&typeof obj==='object'&&!Array.isArray(obj)){
+        const bad=Object.keys(obj).some(k=>/shua|刷单|测评中介/.test(k));
+        if(bad){
+          console.warn('[DB] 拒绝写入含刷单/测评中介字段的对象到 store=',store,obj);
+          if(window.UI&&window.UI.toast) window.UI.toast('检测到非法字段（刷单/测评），已拒绝写入');
+          return Promise.resolve(null);
+        }
+      }
+      return tx(store,'readwrite').then(os=>req(os.put(obj)));
+    },
     del:(store,id)=>tx(store,'readwrite').then(os=>req(os.delete(id))),
     bulk:(store,arr)=>tx(store,'readwrite').then(os=>{
       arr.forEach(o=>os.put(o)); return new Promise(r=>{os.transaction.oncomplete=()=>r(true)});
@@ -414,6 +428,60 @@
       {storeId:stores[0].id,ahr:235,policyWarnings:0,suppressed:0,note:'账户健康良好，无停售'},
       {storeId:stores[1].id,ahr:165,policyWarnings:2,suppressed:2,note:'AHR 偏低，含 2 个停售 ASIN，需申诉恢复'},
       {storeId:stores[2].id,ahr:280,policyWarnings:0,suppressed:0,note:'观察中，关注 AHR 走势'}
+    ]);
+
+    // ===== 选品开发模块新表（Phase 3，缺表才写；公式字段可留空交给前端计算） =====
+    await fillTable('project_progress',()=>[
+      {candidateId:null,progress:'产品数据分析和定位',startDate:dAgo(today,20),doneDate:null,note:'示例进度'},
+      {candidateId:null,progress:'供应商打样与比价',startDate:dAgo(today,10),doneDate:null,note:''}
+    ]);
+    await fillTable('market_analysis',()=>[
+      {sheet:'kw1src',seq:1,asin:'B0XXXX001',brand:'Demo',country:'US',monthSales:600,monthAmt:17994,bsr:340,price:29.99,marginPct:null,rating:4.5,reviews:1820,rev30:120,onDays:200,bb:'是',monopolyPct:null,cap:null},
+      {sheet:'profit',seq:1,dSales:20,price:29.99,rate:6.8,cost:6.2,weightKg:0.4,fba:5.4,commission:4.5,loss:1.5,airFee:null,seaFee:null,totalCost:null,profit:null,profitPct:null,airRoi:null,seaRoi:null}
+    ]);
+    await fillTable('aba_keywords',()=>[
+      {sheet:'summary',seq:1,term:'foldable storage bins',rankQ1:1200,rankQ2:1100,rankQ3:980,rankQ4:1050,rank10000:null,noParamSum:null,trend:null,capacity:'大',recommend:null},
+      {sheet:'dedup',seq:1,term:'storage bins',dedup:'storage bins'}
+    ]);
+    await fillTable('research',()=>[
+      {sheet:'market',seq:1,brand:'Demo',dSales:20,mSales:600,mSalesAmt:17994,asinCount:3,sharePct:null},
+      {sheet:'profit',seq:1,shipMode:'空运',country:'US',size:'M',priceLocal:29.99,rate:6.8,priceUsd:null,costUsd:6.2,firstLeg:2.1,fba:5.4,tariffUs:null,commPct:12,refundPct:5,netPct:null,grossUsd:null,grossPct:null,promoYear:null,note:''}
+    ]);
+    await fillTable('competitor_basic',()=>[
+      {name:'竞品A 折叠收纳箱',category:'家居收纳',recDate:dAgo(today,2),rank:340,img:'',asin:'B0XXXXA01',sales30:600,catRank:'#340',title:'竞品A 折叠收纳箱 大号',bullets:'',keywords:'',price:27.99,fbaFee:5.4,priceTrend:'',priceMin:25.99,priceMax:29.99,onDate:null,variant:'',reviews:1820,rating:4.5,badReviews:36,badRate:null,pkgSize:'',pkgWeight:'',goodContent:'',badContent:'',reviewSummary:'',optimize:''},
+      {name:'竞品B LED氛围灯',category:'照明',recDate:dAgo(today,3),rank:690,asin:'B0XXXXB02',sales30:400,catRank:'#690',title:'竞品B LED氛围灯',price:39.9,fbaFee:6.9,reviews:1010,rating:4.3,badReviews:30,badRate:null}
+    ]);
+    await fillTable('competitor_multi',()=>[
+      {sheet:'summary',seq:1,lifeCycle:'成长期',pNameCn:'折叠收纳箱',purchase:6.2,overseaShip:'海运',headCost:2.1,shipCost:0.5,commission:4.5,gross:null,afterSale:0.3,price:27.99,grossPct:null},
+      {sheet:'priceCalc',seq:1,pNameCn:'折叠收纳箱',L:30,W:20,H:10,gWeight:0.4,nWeight:0.35,purchase:6.2,inShipMode:'陆运',inShipCost:0.3,outShipMode:'海运',outHeadCost:2.1,shipCost:0.5,commission:4.5,commPct:15,gross:null,afterSale:0.3,price:27.99,grossPct:null}
+    ]);
+    // B4：competitor_plan 仅白名单字段，严禁任何 刷单/测评中介 字段
+    await fillTable('competitor_plan',()=>[
+      {sheet:'research',seq:1,recDate:dAgo(today,5),no:'CP-001',kwSite:'US',brand:'Demo',img:'',note:'尺寸重量/卖点/运营特点',rating:4.5,reviews:1820,localPrice:199,rank:340,pubDate:dAgo(today,200),months:8,estMonthSales:600},
+      {sheet:'costCalc',seq:1,product:'折叠收纳箱',asin:'B0XXXXA01',year:2026,month:9,profit:null,breakEvenPrice:null,breakEvenPct:null,rmbCost:null,costRatio:null,realCostRatio:null,price:27.99,fbaSingle:5.4,firstLeg:2.1,productCost:6.2,estSales:600},
+      {sheet:'promoPlan',seq:1,product:'折叠收纳箱',asin:'B0XXXXA01',rivalAsin:'B0XXXXB02',rivalReview:1010,rivalPrice:39.9,rankNote:'',pushDate:dAgo(today,3),priceUsd:27.99,rivalStock:300,product:'折叠收纳箱',costRmb:42,estSales:600,estMonthShipCostRmb:14,amzCommRmb:null,fbaRmb:37,totalHeadRmb:null,estMonthAdRmb:120,estRevRmb:null,totalProdCostRmb:null,lossRmb:null,otherCostRmb:null}
+    ]);
+    await fillTable('profit_check',()=>[
+      {sheet:'size',seq:1,onDate:dAgo(today,5),pName:'折叠收纳箱 大号',img:'',asin:'B0XK1DEMO1',sku:'AH-STORAGE-L',fnsku:'XK1-FNSKU',sizeCm:'30x20x10',weightKg:0.4,pkgSizeCm:'32x22x12',pkgWeightKg:0.5,lxwxhCm:30,lxwxhInch:11.81,pxWxHinch:8.66,pkgLxwxHcm:32,pkgLxWxHinch:12.6,pkgWeightLb:1.1,volDiv6000:null,volDiv5000:null},
+      {sheet:'feeCheck',seq:1,asin:'B0XK1DEMO1',sku:'AH-STORAGE-L',fbaWeightLb:1.1,fbaTier:'标准',estFee:null,fbaRealWeight:null,fbaRealFee:null,update:dAgo(today,1)},
+      {sheet:'profit2',seq:1,sku:'AH-STORAGE-L',purchase$:6.2,firstLeg$:2.1,fbaFee$:5.4,commission$:4.5,refund$:1.5,ad$:7.5,storageOther$:1.0,promo$:3.0,price$:29.99,rate:6.8,shipMode:'空运',version:'预估',volDiv5000:null,volDiv6000:null,cost$:null,profit$:null,profitRmb:null,netPct:null,breakEvenAcos:null}
+    ]);
+    await fillTable('profit_metrics',()=>[
+      {channel:'空运',currency:'美元',price:29.99,weightG:400,freightPerG:0.05,firstLegRmb:14,costRmb:42,rate:6.8,profitRmb:null,profitRatio:null,priceRmb:null,taxRmb:null,commissionRmb:null,preDeduct:null,netReceive:null,amzShipRmb:null,fxLoss:null,volL:null,volW:null,volH:null,volWeightKg:null,qty:null,unitWeight:null},
+      {channel:'海运',currency:'美元',price:39.9,weightG:350,freightPerG:0.02,firstLegRmb:7,costRmb:61,rate:6.8,profitRmb:null,profitRatio:null,priceRmb:null,taxRmb:null,commissionRmb:null,preDeduct:null,netReceive:null,amzShipRmb:null,fxLoss:null}
+    ]);
+    await fillTable('product_analysis',()=>[
+      {sheet:'req',seq:1,cnName:'折叠收纳箱',enName:'Foldable Storage Bins',img:'',func:'家居收纳',scene:'衣柜/储物间',marketAna:'美国站容量大'},
+      {sheet:'us',seq:1,img:'',brand:'Demo',link:'',asin:'B0XK1DEMO1',onDate:dAgo(today,200),rating:4.5,reviewsTotal:1820,price:29.99,mainRank:340,estDSales:20,segment:'家居收纳',segmentDetail:''}
+    ]);
+    await fillTable('dev_plan',()=>[
+      {sheet:'front',seq:1,site:'US',img:'',pName:'折叠收纳箱',kw:'storage bins',cpCount:5,mainSeller:'Demo',saleLink:'',reviews:1820,feedback:null,rating:4.5,badPoint:'',sellingPoint:'',price:27.99,buyLink:'',buyPrice:null,weightG:400,gross:null,lifeCycle:'成长期',grossPct:null},
+      {sheet:'position',seq:1,segment:'家居收纳',targetMarket:'美国站租房人群'},
+      {sheet:'usFba',seq:1,cm:'',country:'US',account:'',brand:'Demo',sku:'AH-STORAGE-L',cnName:'折叠收纳箱',asin:'B0XK1DEMO1',price$:29.99,grossRmb:null,grossPct:null,purchaseRmb:42,weightG:400,firstLegRmb:14,tariff:null,fbaHandling$:null,fbaPick$:null,fbaWeight$:null,commPct:15,referralFee$:null,rate:6.8,firstLegRate:null}
+    ]);
+    await fillTable('fba_rate',()=>[
+      // TODO: 待用户提供 202509 版 FBA 费率表后替换；以下为示例占位，非真实费率
+      {tier:'标准',sizeSeg:'示例',fee:null,note:'示例，待替换（202509 版）'}
     ]);
     return true;
   }
