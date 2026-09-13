@@ -53,12 +53,46 @@
   function tag(text,c){return `<span class="tag ${colorTag[c]||'t-gray'}">${esc(text)}</span>`}
   function dot(c){return `<span class="dot ${colorDot[c]||'d-gray'}"></span>`}
 
+  /* ---------- 风险等级（紧急/高/中） ---------- */
+  const SEV_CLASS={'紧急':'t-urgent','高':'t-high','中':'t-mid'};
+  function sevTag(sev){return `<span class="tag ${SEV_CLASS[sev]||'t-mid'}">${esc(sev)}</span>`}
+  function severityOf(a){
+    if(a.level==='red') return ['合规','账户','库存'].includes(a.type)?'紧急':'高';
+    return '中';
+  }
+
   /* ---------- 组件 ---------- */
   function card(title,body,sub){return `<div class="card"><h3>${esc(title)}</h3>${sub?`<div class="sub">${esc(sub)}</div>`:''}${body}</div>`}
   function kpi(list){
     return `<div class="grid g${list.length>4?4:list.length}" style="margin-bottom:14px">`+
-      list.map(k=>`<div class="kpi ${k.level||''}"><div class="k-lab">${esc(k.label)}</div>
-        <div class="k-val">${k.value}</div><div class="k-sub">${k.sub||''}</div></div>`).join('')+`</div>`;
+      list.map(k=>{const ek=(k.value==='—'||k.value==null)?' k-empty':'';
+        return `<div class="kpi ${k.level||''}${ek}"><div class="k-lab">${esc(k.label)}</div>
+        <div class="k-val">${k.value}</div><div class="k-sub">${k.sub||''}</div></div>`}).join('')+`</div>`;
+  }
+  function empty(text,sub){return `<div class="empty">${esc(text||'暂无数据')}${sub?`<div style="font-size:12px;margin-top:6px;color:var(--ink2)">${esc(sub)}</div>`:''}</div>`}
+  function statBar(cnt,n){
+    return `<div class="stat-bar">
+      <span class="sb-item sb-urgent">紧急 ${cnt['紧急']||0}</span>
+      <span class="sb-item sb-high">高 ${cnt['高']||0}</span>
+      <span class="sb-item sb-mid">中 ${cnt['中']||0}</span>
+      <span class="sb-item sb-total">合计 ${n}</span>
+    </div>`;
+  }
+  function alertItem(a,doneKeys){
+    const sev=severityOf(a); const lvl=a.level==='gray'?'gray':a.level;
+    const isDone=doneKeys&&doneKeys.has&&doneKeys.has(a.key);
+    const cls=['alert-item',a.expired?'expired':'',lvl==='red'?'lv-red':lvl==='yellow'?'lv-yellow':lvl==='gray'?'lv-gray':''].join(' ');
+    return `<div class="${cls}">
+      <div class="ai-main">${dot(lvl)}${sevTag(sev)}${tag(a.type,lvl)}
+        <span class="ai-text">${esc(a.text)}</span></div>
+      <div class="ai-foot">
+        ${a.countdown!=null?`<span class="ai-count ${a.expired?'expired':(a.countdown<=R().nodeRedDays?'red':'gray')}">${a.expired?'⏱ 已过期 '+(-a.countdown)+' 天':'⏱ 剩 '+a.countdown+' 天'}</span>`:''}
+        <span class="ai-actions">
+          ${a.link?`<button class="btn-ghost btn-sm" data-nav="${a.link}">去处理</button>`:''}
+          <button class="btn-ghost btn-sm" data-task="${esc(a.key||a.text)}" data-lv="${a.level}" ${isDone?'disabled':''}>${isDone?'已转待办':'转待办'}</button>
+        </span>
+      </div>
+    </div>`;
   }
   function table(opts){
     const cols=opts.cols, rows=opts.rows||[];
@@ -168,6 +202,6 @@
   }
 
   window.UI={$,esc,num,f0,f2,money,pct,today,dstr,addDays,diffDays,R,setRules,profit,marginColor,tag,dot,
-    card,kpi,table,toast,modal,confirmBox,formFields,formValues,chart,clearCharts,
+    sevTag,severityOf,card,kpi,table,empty,statBar,alertItem,toast,modal,confirmBox,formFields,formValues,chart,clearCharts,
     toCSV,download,exportCSV,parseCSV};
 })();

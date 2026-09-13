@@ -60,7 +60,34 @@ nav{flex:1;overflow:auto}
 .kpi .k-lab{font-size:12px;color:var(--ink2)}
 .kpi .k-val{font-size:20px;font-weight:600;margin:4px 0;color:var(--ink)}
 .kpi .k-sub{font-size:11px;color:var(--ink2)}
-.kpi.alert{border-color:var(--red)} .kpi.warn{border-color:var(--yellow)}
+.kpi.alert{border-color:var(--red);background:#FCEEEC}
+.kpi.alert .k-lab,.kpi.alert .k-val{color:var(--red)}
+.kpi.warn{border-color:var(--yellow);background:#FDF6E6}
+.kpi.warn .k-lab,.kpi.warn .k-val{color:#B8860B}
+.kpi.k-empty .k-val{color:var(--gray);font-style:italic}
+.kpi.k-empty .k-sub{color:var(--gray)}
+.muted{color:var(--gray)}
+.t-urgent{color:#fff;background:var(--red);border-color:var(--red)}
+.t-high{color:#fff;background:#E67E22;border-color:#E67E22}
+.t-mid{color:var(--gray);border-color:var(--gray);background:#EEF2F6}
+.stat-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.sb-item{font-size:12px;padding:3px 10px;border-radius:20px;border:1px solid var(--line)}
+.sb-urgent{color:var(--red);border-color:var(--red);background:#FBECEA}
+.sb-high{color:#E67E22;border-color:#E67E22;background:#FBF0E6}
+.sb-mid{color:var(--gray);border-color:var(--gray);background:#EEF2F6}
+.sb-total{color:var(--blue);border-color:var(--blue);background:#E4EEF9}
+.alert-item{border:1px solid var(--line);border-radius:10px;background:#fff;padding:9px 10px;margin-bottom:8px}
+.alert-item.lv-red{border-color:var(--red)}
+.alert-item.lv-yellow{border-color:var(--yellow)}
+.alert-item.lv-gray{border-color:var(--gray)}
+.alert-item.expired{opacity:.55}
+.ai-main{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.ai-text{flex:1;min-width:0;font-size:13px;color:var(--ink);word-break:break-word}
+.ai-foot{display:flex;align-items:center;gap:8px;margin-top:7px;padding-left:17px;flex-wrap:wrap}
+.ai-count{font-size:11px;color:var(--gray)}
+.ai-count.red{color:var(--red);font-weight:600}
+.ai-actions{margin-left:auto;display:flex;gap:6px}
+.ai-actions .btn-sm[disabled]{opacity:.5;cursor:default}
 
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left}

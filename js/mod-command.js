@@ -20,48 +20,63 @@
     const stores=await DB.all('stores'); const prods=await DB.all('products');
     const invs=await DB.all('inventory'); const ads=await DB.all('ads');
     const comps=await DB.all('compliance'); const nodes=await DB.all('nodes');
+    let ahs=[]; try{ ahs=await DB.all('account_health'); }catch(e){ ahs=[]; }
     const pm={}; prods.forEach(p=>pm[p.id]=p);
     const sm={}; stores.forEach(s=>sm[s.id]=s);
-    const invByP={}; invs.forEach(i=>invByP[i.productId]=i);
     const r=U.R();
     invs.forEach(i=>{
       const p=pm[i.productId]; if(!p) return;
       const cover=i.dailySalesAvg>0?(i.fbaQty+i.inboundQty-i.reserveQty)/i.dailySalesAvg:null;
-      if(cover!=null&&cover<r.stockRed) out.push({level:'red',type:'库存',storeId:p.storeId,
-        text:`${p.sku} 可售仅 ${cover.toFixed(0)} 天（<${r.stockRed} 天），最晚补货日 ${U.addDays(U.today(),Math.max(0,Math.floor(cover)-i.leadDays))}`,link:'inventory'});
-      else if(cover!=null&&cover<r.stockYellow) out.push({level:'yellow',type:'库存',storeId:p.storeId,
-        text:`${p.sku} 可售 ${cover.toFixed(0)} 天，需安排补货`,link:'inventory'});
-      if(num180(i)>0) out.push({level:'red',type:'库存',storeId:p.storeId,text:`${p.sku} 库龄 >180 天 ${i.aging180} 件，长期仓储费风险`,link:'inventory'});
+      if(cover!=null&&cover<r.stockRed) out.push({level:'red',type:'库存',storeId:p.storeId,countdown:Math.floor(cover),
+        text:`${p.sku} 可售仅 ${cover.toFixed(0)} 天（<${r.stockRed} 天），最晚补货日 ${U.addDays(U.today(),Math.max(0,Math.floor(cover)-i.leadDays))}`,link:'inventory',key:`库存|COVER|${p.id}`});
+      else if(cover!=null&&cover<r.stockYellow) out.push({level:'yellow',type:'库存',storeId:p.storeId,countdown:Math.floor(cover),
+        text:`${p.sku} 可售 ${cover.toFixed(0)} 天，需安排补货`,link:'inventory',key:`库存|COVER|${p.id}`});
+      if(num180(i)>0) out.push({level:'red',type:'库存',storeId:p.storeId,
+        text:`${p.sku} 库龄 >180 天 ${i.aging180} 件，长期仓储费风险`,link:'inventory',key:`库存|AGING|${p.id}`});
     });
     ads.forEach(a=>{
       const p=pm[a.productId]; if(!p) return;
       const pf=U.profit(p); const be=pf.breakEvenAcos; const acos=a.sales?a.spend/a.sales*100:null;
       if(acos!=null&&be!=null&&acos>be) out.push({level:'red',type:'广告',storeId:p.storeId,
-        text:`${a.name} ACOS ${acos.toFixed(1)}% 超保本线 ${be.toFixed(1)}%`,link:'ads'});
+        text:`${a.name} ACOS ${acos.toFixed(1)}% 超保本线 ${be.toFixed(1)}%`,link:'ads',key:`广告|ACOS|${a.productId}`});
       if(a.spend>0&&(!a.sales||a.sales===0)) out.push({level:'yellow',type:'广告',storeId:p.storeId,
-        text:`${a.name} 有花费无产出`,link:'ads'});
+        text:`${a.name} 有花费无产出`,link:'ads',key:`广告|NOSALE|${a.productId}`});
     });
     prods.forEach(p=>{
       const pf=U.profit(p);
       if(pf.margin!=null&&pf.margin<r.marginRed) out.push({level:'red',type:'利润',storeId:p.storeId,
-        text:`${p.sku} 净利率 ${pf.margin.toFixed(1)}% 低于 ${r.marginRed}%`,link:'products'});
+        text:`${p.sku} 净利率 ${pf.margin.toFixed(1)}% 低于 ${r.marginRed}%`,link:'products',key:`利润|MARGIN|${p.id}`});
     });
     comps.forEach(c=>{
       const d=U.diffDays(c.expireDate,U.today());
-      if(d<0) out.push({level:'red',type:'合规',storeId:c.storeId,text:`${c.item} 已过期 ${-d} 天`,link:'compliance'});
-      else if(d<=(c.reminderDays||30)) out.push({level:'yellow',type:'合规',storeId:c.storeId,
-        text:`${c.item} 将在 ${d} 天后到期`,link:'compliance'});
+      if(d<0) out.push({level:'red',type:'合规',storeId:c.storeId,expired:true,countdown:d,
+        text:`${c.item} 已过期 ${-d} 天`,link:'compliance',key:`合规|EXP|${c.storeId}|${c.item}`});
+      else if(d<=(c.reminderDays||30)) out.push({level: d<=r.nodeRedDays?'red':'yellow',type:'合规',storeId:c.storeId,countdown:d,
+        text:`${c.item} 将在 ${d} 天后到期`,link:'compliance',key:`合规|EXP|${c.storeId}|${c.item}`});
+    });
+    ahs.forEach(a=>{
+      const st=sm[a.storeId]; const sn=st?st.name:'店铺';
+      if(a.ahr!=null&&a.ahr<200) out.push({level:'red',type:'账户',storeId:a.storeId,
+        text:`${sn} 账户健康分 AHR ${a.ahr} 低于 200，存在停号风险`,link:'stores',key:`账户|AHR|${a.storeId}`});
+      else if(a.ahr!=null&&a.ahr<300) out.push({level:'yellow',type:'账户',storeId:a.storeId,
+        text:`${sn} 账户健康分 AHR ${a.ahr}，需关注`,link:'stores',key:`账户|AHR|${a.storeId}`});
+      if(a.suppressed>0) out.push({level:'red',type:'账户',storeId:a.storeId,
+        text:`${sn} 有 ${a.suppressed} 个 ASIN 被停售/抑制，需申诉恢复`,link:'stores',key:`账户|SUP|${a.storeId}`});
+      if(a.policyWarnings>0) out.push({level:'yellow',type:'账户',storeId:a.storeId,
+        text:`${sn} 有 ${a.policyWarnings} 条政策警告待处理`,link:'stores',key:`账户|POL|${a.storeId}`});
     });
     nodes.forEach(n=>{
       if(n.done) return;
       const d=U.diffDays(n.deadline,U.today());
-      if(d<0) return;
-      if(d<=r.nodeRedDays) out.push({level:'red',type:'节点',storeId:null,
-        text:`${n.site} ${n.eventName} · ${n.type} 截止 ${n.deadline}（剩 ${d} 天）`,link:'peak'});
+      if(d<0){ if(d>=-30) out.push({level:'gray',type:'节点',storeId:null,expired:true,countdown:d,
+        text:`${n.site} ${n.eventName} · ${n.type} 已逾期 ${(-d)} 天（截止 ${n.deadline}）`,link:'peak',key:`节点|EXP|${n.id}`}); return; }
+      out.push({level:d<=r.nodeRedDays?'red':'yellow',type:'节点',storeId:null,countdown:d,
+        text:`${n.site} ${n.eventName} · ${n.type} 截止 ${n.deadline}（剩 ${d} 天）`,link:'peak',key:`节点|DUE|${n.id}`});
     });
-    const order={red:0,yellow:1};
+    const order={red:0,yellow:1,gray:2};
     const typeOrder={合规:0,账户:1,库存:2,利润:3,广告:4,节点:5};
-    out.sort((a,b)=>(order[a.level]-order[b.level])||((typeOrder[a.type]||9)-(typeOrder[b.type]||9)));
+    out.sort((a,b)=>(order[a.level]-order[b.level])||((typeOrder[a.type]||9)-(typeOrder[b.type]||9))
+      ||(a.countdown==null?1:(b.countdown==null?-1:a.countdown-b.countdown)));
     return out;
   }
   function num180(i){return Number(i.aging180)||0}
@@ -97,6 +112,15 @@
       estSales+=Number(r.sales)||0; estNet+=(Number(r.sales)||0)*(pf.margin||0)/100;});
     const netPct=estSales?estNet/estSales*100:null;
 
+    // 综合 ACOS 保本线（按销售额加权）
+    let wBeNum=0,wBeDen=0;
+    cur.forEach(r=>{const p=pm[r.productId]; if(!p)return; const pf=U.profit(p);
+      if(pf.breakEvenAcos!=null&&r.sales){ wBeNum+=pf.breakEvenAcos*r.sales; wBeDen+=r.sales; }});
+    const beW=wBeDen?wBeNum/wBeDen:null;
+    let acosLevel='';
+    if(acos1!=null){ if(beW!=null&&acos1>beW) acosLevel='alert'; else if(acos1>25) acosLevel='warn'; }
+    const netLevel=netPct!=null?(netPct<U.R().marginRed?'alert':(netPct<U.R().marginYellow?'warn':'')):'';
+
     root.innerHTML=
       U.kpi([
         {label:'销售额',value:U.money(s1),sub:'环比 '+chg(s1,s0),level:''},
@@ -104,9 +128,8 @@
         {label:'转化率',value:U.pct(cvr1),sub:'会话 '+U.f0(se1)},
         {label:'广告花费',value:U.money(ad1),sub:'占销售额 '+(s1?U.pct(ad1/s1*100):'—'),
           level:(s1&&ad1/s1*100>U.R().adShareRed)?'alert':((s1&&ad1/s1*100>U.R().adShareYellow)?'warn':'')},
-        {label:'综合 ACOS',value:U.pct(acos1),sub:'广告销售 '+U.money(ads1)},
-        {label:'估算净利',value:U.money(estNet),sub:'净利率 '+U.pct(netPct),
-          level:netPct!=null&&netPct<U.R().marginRed?'alert':''}
+        {label:'综合 ACOS',value:U.pct(acos1),sub:beW!=null?('保本线 '+U.pct(beW)):'广告销售 '+U.money(ads1),level:acosLevel},
+        {label:'估算净利',value:U.money(estNet),sub:'净利率 '+U.pct(netPct),level:netLevel}
       ])+
       `<div class="grid g2">
         <div class="card"><h3>销售与广告趋势</h3><div id="cSales" class="chart"></div></div>
@@ -122,7 +145,8 @@
     cur.forEach(r=>{byDate[r.date]=byDate[r.date]||{sales:0,ad:0};
       byDate[r.date].sales+=Number(r.sales)||0; byDate[r.date].ad+=Number(r.adSpend)||0});
     const dates=Object.keys(byDate).sort();
-    U.chart(document.getElementById('cSales'),{
+    const cSalesEl=document.getElementById('cSales');
+    if(dates.length) U.chart(cSalesEl,{
       tooltip:{trigger:'axis'},
       legend:{data:['销售额','广告花费'],top:0},
       xAxis:{type:'category',data:dates},
@@ -131,38 +155,44 @@
         itemStyle:{color:'#1E5FA8'},areaStyle:{color:'#CFE0F2'}},
         {name:'广告花费',type:'line',smooth:true,yAxisIndex:1,data:dates.map(d=>+(byDate[d].ad).toFixed(2)),
         itemStyle:{color:'#C0392B'}}]
-    });
+    }); else cSalesEl.innerHTML=U.empty('本期暂无销售数据','调整筛选区间或店铺范围后重试');
+
     const rf=sum(cur,'refunds');
-    U.chart(document.getElementById('cFunnel'),{
+    const cFunnelEl=document.getElementById('cFunnel');
+    if(se1>0) U.chart(cFunnelEl,{
       tooltip:{trigger:'item'},
       series:[{type:'funnel',left:'10%',width:'80%',
         data:[{name:'会话',value:se1},{name:'订单',value:o1},{name:'退款',value:rf},{name:'净订单',value:Math.max(0,o1-rf)}],
         color:['#1E5FA8','#D4A017','#C0392B','#27AE60']}]
-    });
+    }); else cFunnelEl.innerHTML=U.empty('本期暂无流量数据');
+
     const stores=await DB.all('stores'); const sm={}; stores.forEach(s=>sm[s.id]=s);
     const pie={}; cur.forEach(r=>{const n=sm[r.storeId]?sm[r.storeId].name:'未分配';pie[n]=(pie[n]||0)+(Number(r.sales)||0)});
-    U.chart(document.getElementById('cPie'),{
+    const cPieEl=document.getElementById('cPie');
+    if(Object.keys(pie).length) U.chart(cPieEl,{
       tooltip:{trigger:'item'},
       legend:{bottom:0},
       series:[{type:'pie',radius:['40%','65%'],data:Object.keys(pie).map(k=>({name:k,value:+pie[k].toFixed(2)})),
         color:['#1E5FA8','#D4A017','#27AE60','#7E8C99','#C0392B']}]
-    });
+    }); else cPieEl.innerHTML=U.empty('本期暂无销售构成数据');
 
+    // 异常提醒：顶部统计 + 列表（去重 + 转待办闭环）
     const list=await anomalies();
+    const cnt={紧急:0,高:0,中:0}; list.forEach(a=>{cnt[U.severityOf(a)]++;});
+    const tasksAll=await DB.all('tasks');
+    const doneKeys=new Set(tasksAll.filter(t=>t.sourceKey).map(t=>t.sourceKey));
+    const byKey={}; list.forEach(a=>byKey[a.key]=a.text);
     const box=document.getElementById('anomBox');
-    box.innerHTML=list.length?`<div style="max-height:230px;overflow:auto">`+list.slice(0,20).map(a=>
-      `<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)">
-        ${U.dot(a.level)}<span style="flex:1;font-size:13px">${U.esc(a.text)}</span>
-        ${U.tag(a.type,a.level)}
-        <button class="btn-ghost btn-sm" data-nav="${a.link}">去处理</button>
-        <button class="btn-ghost btn-sm" data-task="${U.esc(a.text)}" data-lv="${a.level}">转待办</button>
-      </div>`).join('')+`</div>`
-      :`<div class="empty">当前范围内无异常，继续保持先风险后经营的巡检节奏</div>`;
+    box.innerHTML=list.length?U.statBar(cnt,list.length)+
+      `<div style="max-height:300px;overflow:auto">`+list.map(a=>U.alertItem(a,doneKeys)).join('')+`</div>`
+      :U.empty('当前范围内无异常','继续保持先风险后经营的巡检节奏');
     box.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>App.go(b.dataset.nav));
     box.querySelectorAll('[data-task]').forEach(b=>b.onclick=async()=>{
-      await DB.put('tasks',{source:'巡检',title:b.dataset.task,priority:b.dataset.lv==='red'?'红':'黄',
-        dueDate:U.today(),relatedId:null,done:false});
-      U.toast('已转为待办'); App.go('tasks');
+      const key=b.dataset.task, lv=b.dataset.lv;
+      if(doneKeys.has(key)){ U.toast('该异常已转为待办'); App.go('tasks'); return; }
+      await DB.put('tasks',{source:'巡检',title:byKey[key]||key,sourceKey:key,
+        priority:lv==='red'?'红':'黄',dueDate:U.addDays(U.today(),7),relatedId:null,done:false});
+      U.toast('已转为待办（默认 +7 天）'); App.refresh();
     });
   };
 
@@ -172,10 +202,11 @@
     const list=await anomalies();
     const domains=['合规','账户','库存','广告','利润','节点'];
     const idx={};
+    const rank={green:0,gray:1,yellow:2,red:3};
     list.forEach(a=>{
       const sid=a.storeId||'ALL'; idx[sid]=idx[sid]||{};
       const cur=idx[sid][a.type]||'green';
-      if(a.level==='red'||cur==='red') idx[sid][a.type]='red'; else idx[sid][a.type]='yellow';
+      if(rank[a.level]>rank[cur]) idx[sid][a.type]=a.level;
     });
     const cell=(sid,d)=>{
       const v=(idx[sid]&&idx[sid][d])||null;
@@ -196,9 +227,9 @@
           ${domains.map(d=>cell(s.id,d)).join('')}</tr>`).join('')}</tbody></table>
       </div>
       <div class="card"><h3>异常明细</h3>`+
-      (list.length?`<table><thead><tr><th>级别</th><th>类型</th><th>店铺</th><th>说明</th></tr></thead><tbody>`+
-        list.map(a=>{const st=stores.find(s=>s.id===a.storeId);
-          return `<tr><td>${U.dot(a.level)}</td><td>${U.esc(a.type)}</td>
+      (list.length?`        <table><thead><tr><th>级别</th><th>严重度</th><th>类型</th><th>店铺</th><th>说明</th></tr></thead><tbody>`+
+        list.map(a=>{const st=stores.find(s=>s.id===a.storeId); const lvl=a.level==='gray'?'gray':a.level;
+          return `<tr><td>${U.dot(lvl)}</td><td>${U.sevTag(U.severityOf(a))}</td><td>${U.esc(a.type)}</td>
           <td>${U.esc(st?st.name:'全局')}</td><td>${U.esc(a.text)}</td></tr>`}).join('')+`</tbody></table>`
         :`<div class="empty">无异常</div>`)+`</div>`;
     root.querySelectorAll('.heat').forEach(td=>{td.style.cursor='pointer'});
@@ -218,7 +249,7 @@
         <div class="sub">固定顺序：账户 → 销售 → 广告 → 库存 → 转化 → 售后 → 政策。先风险，后经营；先异常，后优化。</div>
         <div class="toolbar">
           <select id="pStore" class="mini" style="max-width:220px">
-            ${stores.map(s=>`<option value="${s.id}" ${s.id===sidSel?'selected':''}>${U.esc(s.name)}（${s.site}）</option>`).join('')}
+            ${stores.map(s=>`<option value="${s.id}" ${s.id===sidSel?'selected':''}>${U.esc(s.name)}</option>`).join('')}
           </select>
           <span style="font-size:12px;color:var(--ink2)">进度 ${done}/7</span>
           <div class="bar" style="flex:1;min-width:120px"><i style="width:${done/7*100}%"></i></div>

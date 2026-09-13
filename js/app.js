@@ -100,7 +100,7 @@
     box.onclick=()=>{
       U.modal({title:'选择店铺（可多选）',
         body:`<div style="font-size:13px;line-height:2">`+stores.map(s=>
-          `<label style="display:block"><input type="checkbox" value="${s.id}" ${sel.indexOf(s.id)>=0?'checked':''}> ${U.esc(s.name)}（${s.site}）</label>`).join('')+
+          `<label style="display:block"><input type="checkbox" value="${s.id}" ${sel.indexOf(s.id)>=0?'checked':''}> ${U.esc(s.name)}</label>`).join('')+
           `</div><div style="margin-top:10px"><button class="btn-ghost" id="selAll">全选/清空</button></div>`,
         okText:'应用',
         onOk:b=>{

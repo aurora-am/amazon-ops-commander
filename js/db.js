@@ -1,11 +1,11 @@
 (function(){
   const DB_NAME='commander_db';
-  const DB_VER=2;
+  const DB_VER=4;
   const TABLES=['stores','products','kpi_daily','listings','reviews','ads','searchterms',
     'inventory','ship_plans','returns','claims','promos','compliance','nodes','tasks',
     'diagnosis_log','competitors','keywords','candidates','patrol','settings','snapshots',
     'newlaunch','purchase','logistics','qc','appeal','reply','influencer','finance',
-    'kpi_score','team','toolbox'];
+    'kpi_score','team','toolbox','account_health'];
 
   let _db=null;
   function open(){
@@ -409,6 +409,11 @@
       {kind:'实用网站',title:'卖家百科',content:'规则/政策查询',link:'https://sellercentral.amazon.com/help'},
       {kind:'发票模板',title:'采购发票(英文)',content:'Supplier / PO# / Item / Qty / Unit / Total / Date，含税号',link:''},
       {kind:'发票模板',title:'FBA 入仓发票',content:'用于清关，需含 HS Code / 材质 / 用途',link:''}
+    ]);
+    await fillTable('account_health',()=>[
+      {storeId:stores[0].id,ahr:235,policyWarnings:0,suppressed:0,note:'账户健康良好，无停售'},
+      {storeId:stores[1].id,ahr:165,policyWarnings:2,suppressed:2,note:'AHR 偏低，含 2 个停售 ASIN，需申诉恢复'},
+      {storeId:stores[2].id,ahr:280,policyWarnings:0,suppressed:0,note:'观察中，关注 AHR 走势'}
     ]);
     return true;
   }
