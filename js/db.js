@@ -480,8 +480,12 @@
       {sheet:'usFba',seq:1,cm:'',country:'US',account:'',brand:'Demo',sku:'AH-STORAGE-L',cnName:'折叠收纳箱',asin:'B0XK1DEMO1',price$:29.99,grossRmb:null,grossPct:null,purchaseRmb:42,weightG:400,firstLegRmb:14,tariff:null,fbaHandling$:null,fbaPick$:null,fbaWeight$:null,commPct:15,referralFee$:null,rate:6.8,firstLegRate:null}
     ]);
     await fillTable('fba_rate',()=>[
-      // TODO: 待用户提供 202509 版 FBA 费率表后替换；以下为示例占位，非真实费率
-      {tier:'标准',sizeSeg:'示例',fee:null,note:'示例，待替换（202509 版）'}
+      // 以 ui.js 的 FBA_RATES（美国站 2026-01-15 生效，非旺季/非服装/非危险品/$10-50 价格带）为权威内置表。
+      // 此 fba_rate store 仅供用户在「设置-费率维护」中覆盖/补充个别分段费率；以下仅为 2 行示例。
+      {tier:'smallStandard', sizeSeg:'≤2oz', band:'mid', fee:3.32, effDate:'2026-01-15',
+        note:'小号标准 ≤2oz mid 费率（示例，权威值见 ui.js FBA_RATES；后台最新费率为准，可编辑覆盖）'},
+      {tier:'largeStandard', sizeSeg:'3-20lb 基础', band:'mid', fee:6.97, effDate:'2026-01-15',
+        note:'大号标准 3-20lb mid 基础费（示例，权威值见 ui.js FBA_RATES；含 $0.16/半磅续重与 3.5% 燃油附加费另计）'}
     ]);
     return true;
   }

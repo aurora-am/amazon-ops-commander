@@ -7,7 +7,7 @@
   const P={}; const U=window.UI, DB=window.DB;
   const esc=U.esc;
   const num=(v,d)=>{const n=Number(v);return isFinite(n)?n:(d===undefined?null:d);};
-  const DEFAULT_RATE=6.8; // TODO 待用户确认精确汇率源后替换（仅作记录级默认初始值，不全局硬编码）
+  const DEFAULT_RATE=(U.RATES&&U.RATES.USD)?U.RATES.USD:6.71; // B5：默认指向 U.RATES.USD（记录级 rate 字段初始值，不全局硬编码）
 
   /* ---------- 字段定义辅助 ---------- */
   const F=(k,t,o)=>Object.assign({k,t},o||{});
@@ -68,8 +68,22 @@
   }
   // L4 选品利润指标（公式细节待确认）——已知项直接计算，依赖项留 TODO 占位
   function computeProfitMetrics(r){
+    // 汇率：记录级可编辑；未填时按货币从 U.RATES 取默认（USD 兜底 DEFAULT_RATE）
+    if(r.rate==null || r.rate===''){
+      const code={'美元':'USD','英镑':'GBP','欧元':'EUR','加元':'CAD','墨西哥比索':'MXN','日元':'JPY'}[r.currency];
+      r.rate=(code && U.RATES && U.RATES[code]!=null) ? U.RATES[code] : DEFAULT_RATE;
+    }
     const rate=num(r.rate,DEFAULT_RATE);
     const priceRmb=num(r.price)*rate;
+    // 头程：未填 firstLegRmb 时，按渠道 × 计费重量（实重与体积重取大）÷6000 由 U.firstLegCost 估算
+    if(r.firstLegRmb==null || r.firstLegRmb===''){
+      const realKg=num(r.weightG)/1000;
+      const vl=num(r.volL), vw=num(r.volW), vh=num(r.volH);
+      const volKg=(vl&&vw&&vh)?U.volWeight(vl,vw,vh,6000):0;
+      const chgKg=Math.max(realKg, volKg);
+      const ch={'空运':'air','专线':'seaExpress','海运':'seaExpress','铁运':'seaTruck','卡航':'seaTruck'}[r.channel]||'seaExpress';
+      r.firstLegRmb=U.firstLegCost(chgKg, ch);
+    }
     const firstLeg=num(r.firstLegRmb)||0, cost=num(r.costRmb)||0;
     const preDeduct=num(r.preDeduct); const pd=(preDeduct==null)?priceRmb*(0.07+0.05):preDeduct; // 广告7%+退货5%
     const fx=num(r.fxLoss); const fl=(fx==null)?priceRmb*0.01:fx; // 汇损1% 占位（L4 待确认）
@@ -83,6 +97,69 @@
     if(r.commissionRmb==null) r.commissionRmb=null;
     if(r.amzShipRmb==null) r.amzShipRmb=null;
     if(r.netReceive==null) r.netReceive=null;
+  }
+
+  /* ---------- 尺寸/币种解析辅助（供 profit 类 compute 调用 U.* 公式） ---------- */
+  // 解析 "30x20x10" / "30×20×10" / "30*20*10" → [l,w,h]（数值，单位保持原样）
+  function parseTriple(str){
+    if(str==null) return null;
+    const m=String(str).split(/[x×*]/).map(s=>Number(s.trim())).filter(n=>isFinite(n)&&n>0);
+    return m.length>=3 ? m.slice(0,3) : (m.length===1 ? [m[0],m[0],m[0]] : null);
+  }
+  const CM2INCH=0.393701;
+  // FBA tier 文本（key 或 中文标签 或 旧值'标准'/'大件'/'超大件'）→ 规范 tier key
+  function fbaTierKey(val){
+    if(!val) return null;
+    const FR=U.FBA_RATES; if(!FR) return null;
+    const keys={'smallStandard':'smallStandard','largeStandard':'largeStandard','smallBulky':'smallBulky','largeBulky':'largeBulky',
+      'oversize-0-50':'oversize-0-50','oversize-50-70':'oversize-50-70','oversize-70-150':'oversize-70-150','oversize-150plus':'oversize-150plus'};
+    if(keys[val]) return val;
+    const label2key={};
+    Object.keys(FR.tiers).forEach(k=>{ if(k!=='oversize') label2key[FR.tiers[k].label]=k; });
+    Object.keys(FR.tiers.oversize.bands).forEach(b=>{ label2key[FR.tiers.oversize.bands[b].label]='oversize-'+b; });
+    if(label2key[val]) return label2key[val];
+    if(val==='标准') return 'largeStandard';     // 旧 seed 值兼容
+    if(val==='小号标准') return 'smallStandard';
+    if(val==='大件') return 'largeBulky';
+    if(val==='超大件') return 'oversize-0-50';
+    return null;
+  }
+
+  // 1-产品尺寸录入表：头程抛重(÷6000/÷5000) + 输入尺寸自动算 FBA 分段/计费重/配送费（用户亦可在 feeCheck 手填覆盖）
+  function computeSize(r){
+    // 头程抛重（cm）：优先用包装尺寸，回退产品尺寸
+    const cmTriple = parseTriple(r.pkgSizeCm) || parseTriple(r.sizeCm);
+    if(cmTriple){
+      const v=cmTriple[0]*cmTriple[1]*cmTriple[2];
+      r.volDiv6000=+(v/6000).toFixed(3);
+      r.volDiv5000=+(v/5000).toFixed(3);
+    }
+    // FBA 分段/计费重/配送费：由包装 inch 尺寸（pkgSizeCm）+ 包装实重(lb) 自动算
+    const pkgCm=parseTriple(r.pkgSizeCm);
+    if(pkgCm && r.pkgWeightLb!=null){
+      const dims={ l:pkgCm[0]*CM2INCH, w:pkgCm[1]*CM2INCH, h:pkgCm[2]*CM2INCH, weightLb:num(r.pkgWeightLb) };
+      const est=U.fbaEstimate(dims, {priceBand:'mid', includeSurcharge:true});
+      r.fbaTier=U.fbaTierLabel(est.tier);          // 中文标签，便于阅读
+      r.fbaChargeWtLb=est.chargeableLb;            // 计费重量 lb
+      r.estFee=est.fee;                            // 预估 FBA 配送费 $（含 3.5% 燃油附加费）
+    }
+  }
+  // 2-配送费预估核对：用户手填 FBA 尺寸分段 + 计费重量 → 自动算预估配送费（fbaRealFee 仍由用户填实际值覆盖）
+  function computeFeeCheck(r){
+    if(r.fbaTier && r.fbaWeightLb!=null){
+      const key=fbaTierKey(r.fbaTier);
+      if(key){
+        const fee=U.fbaFee(key, num(r.fbaWeightLb), {priceBand:'mid', includeSurcharge:true});
+        if(fee!=null) r.estFee=fee;
+      }
+    }
+  }
+  // ABA 汇总：录入 q1-q4 后自动判定 trend/capacity/recommend + 无参数统计
+  function computeAbaRow(r){
+    const res=U.computeAba(r);
+    r.trend=res.trend; r.capacity=res.capacity; r.recommend=res.recommend;
+    const ranks=[r.rankQ1,r.rankQ2,r.rankQ3,r.rankQ4].map(x=>Number(x));
+    r.noParamSum=ranks.filter(x=>isFinite(x)&&x===10000).length; // 无参数(=10000)季度计数
   }
 
   /* ---------- 通用单表挂载（toolbar + 表格 + 增删改 + 导出） ---------- */
@@ -267,9 +344,10 @@
 
   const ABA_SHEETS=[
     {key:'summary',label:'汇总',store:'aba_keywords',sheet:'summary',
+      compute:computeAbaRow,
       fields:[F('term','搜索词'),N('rankQ1','排名1-3月'),N('rankQ2','排名4-6月'),N('rankQ3','排名7-9月'),
         N('rankQ4','排名10-12月'),N('rank10000','排名10000'),R('noParamSum','无参数总和',{f:r=>r.noParamSum==null?'—':r.noParamSum}),
-        F('trend','趋势'),F('capacity','容量'),F('recommend','推荐')],empty:'暂无数据'},
+        R('trend','趋势',{f:r=>r.trend||'—'}),R('capacity','容量',{f:r=>r.capacity||'—'}),R('recommend','推荐',{f:r=>r.recommend||'—'})],empty:'暂无数据'},
     {key:'q1',label:'1-3月',store:'aba_keywords',sheet:'q1',
       fields:[N('seq','序列'),F('term','搜索词'),N('rank','搜索频率排名')],empty:'暂无数据'},
     {key:'q2',label:'4-6月',store:'aba_keywords',sheet:'q2',
@@ -471,16 +549,21 @@
 
   const PROFIT_CHECK_SHEETS=[
     {key:'size',label:'1-产品尺寸录入表',store:'profit_check',sheet:'size',
+      compute:computeSize,
       fields:[F('onDate','上架日期',{type:'date'}),F('pName','品名'),URLF('img','图片'),F('asin','ASIN'),F('sku','后台SKU'),
         F('fnsku','FNSKU'),F('sizeCm','产品尺寸cm'),N('weightKg','产品实重kg'),F('pkgSizeCm','包装尺寸cm'),N('pkgWeightKg','包装实重kg'),
         N('lxwxhCm','长宽高cm'),N('lxwxhInch','长宽高inch'),F('pxWxHinch','产品尺寸inch(占位)'),F('pkgLxwxHcm','包装长宽高cm'),
         F('pkgLxWxHinch','包装长宽高inch'),N('pkgWeightLb','包装实重lb'),
         R('volDiv6000','头程抛重kg(÷6000)',{f:r=>r.volDiv6000==null?'—':U.f2(r.volDiv6000)}),
-        R('volDiv5000','头程抛重kg(÷5000)',{f:r=>r.volDiv5000==null?'—':U.f2(r.volDiv5000)})],
+        R('volDiv5000','头程抛重kg(÷5000)',{f:r=>r.volDiv5000==null?'—':U.f2(r.volDiv5000)}),
+        R('fbaTier','FBA尺寸分段',{f:r=>r.fbaTier||'—'}),
+        R('fbaChargeWtLb','FBA计费重量lb',{f:r=>r.fbaChargeWtLb==null?'—':U.f2(r.fbaChargeWtLb)}),
+        R('estFee','预估FBA配送费$',{f:r=>r.estFee==null?'—':U.money(r.estFee)})],
       empty:'暂无数据'},
     {key:'feeCheck',label:'2-配送费预估核对',store:'profit_check',sheet:'feeCheck',
+      compute:computeFeeCheck,
       fields:[F('asin','ASIN'),F('sku','后台SKU'),N('fbaWeightLb','FBA计费重量lb'),F('fbaTier','FBA尺寸分段'),
-        N('estFee','预估配送费$',{ph:'由 U.fbaFee 查表(B3)'}),N('fbaRealWeight','FBA实际包装计重'),N('fbaRealFee','FBA实际配送费$'),F('update','UPDATE',{type:'date'})],
+        N('estFee','预估配送费$',{ph:'录入分段+重量后由 U.fbaFee 自动算(B3)'}),N('fbaRealWeight','FBA实际包装计重'),N('fbaRealFee','FBA实际配送费$'),F('update','UPDATE',{type:'date'})],
       empty:'暂无数据'},
     {key:'profit2',label:'3-利润预估表2.0（母口径 B2）',store:'profit_check',sheet:'profit2',
       fields:[F('sku','SKU'),N('purchase$','采购价$'),N('firstLeg$','头程运费预估$'),N('fbaFee$','FBA配送费$'),N('commission$','平台佣金$'),
@@ -503,7 +586,7 @@
       S('channel','渠道',['空运','专线','海运','铁运','卡航'].map(opt)),
       S('currency','货币',['美元','英镑','欧元','加元','墨西哥比索','日元'].map(opt)),
       N('price','商品售价'),N('weightG','单个重量/g'),N('freightPerG','货代/1g'),N('firstLegRmb','头程FBA运费/RMB'),
-      N('costRmb','商品成本/RMB'),N('rate','汇率',{def:DEFAULT_RATE}),
+      N('costRmb','商品成本/RMB'),N('rate','汇率',{ph:'未填则按币种取 U.RATES 默认'}),
       R('priceRmb','兑换后售价/RMB',{f:r=>r.priceRmb==null?'—':U.money(r.priceRmb,'￥')}),
       R('profitRmb','利润/RMB',{f:r=>r.profitRmb==null?'—':U.money(r.profitRmb,'￥')}),
       R('profitRatio','利润比%',{f:r=>r.profitRatio==null?'—':U.pct(r.profitRatio)}),
