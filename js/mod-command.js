@@ -24,9 +24,11 @@
     const pm={}; prods.forEach(p=>pm[p.id]=p);
     const sm={}; stores.forEach(s=>sm[s.id]=s);
     const r=U.R();
+    const avg=await U.dailyAvgMap();
     invs.forEach(i=>{
       const p=pm[i.productId]; if(!p) return;
-      const cover=i.dailySalesAvg>0?(i.fbaQty+i.inboundQty-i.reserveQty)/i.dailySalesAvg:null;
+      const daily=avg[i.productId]!=null?avg[i.productId]:(Number(i.dailySalesAvg)||0);
+      const cover=daily>0?(i.fbaQty+i.inboundQty-i.reserveQty)/daily:null;
       if(cover!=null&&cover<r.stockRed) out.push({level:'red',type:'库存',storeId:p.storeId,countdown:Math.floor(cover),
         text:`${p.sku} 可售仅 ${cover.toFixed(0)} 天（<${r.stockRed} 天），最晚补货日 ${U.addDays(U.today(),Math.max(0,Math.floor(cover)-i.leadDays))}`,link:'inventory',key:`库存|COVER|${p.id}`});
       else if(cover!=null&&cover<r.stockYellow) out.push({level:'yellow',type:'库存',storeId:p.storeId,countdown:Math.floor(cover),

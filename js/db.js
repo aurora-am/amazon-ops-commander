@@ -171,7 +171,7 @@
           sales:[430,260,150,120][idx],impressions:[12000,9000,5000,3000][idx],clicks:[210,150,70,45][idx],
           date:today.toISOString().slice(0,10)});
         DB.put('inventory',{productId:p.id,fbaQty:[180,320,90,240][idx],inboundQty:[0,120,60,0][idx],
-          reserveQty:[10,15,5,8][idx],dailySalesAvg:[42,30,18,12][idx],leadDays:[45,45,35,40][idx],
+          reserveQty:[10,15,5,8][idx],dailySalesAvg:[42,30,18,12][idx],leadDays:[45,45,35,40][idx], // dailySalesAvg 现为兜底值：kpi_daily 有该品近30天数据时由页面动态覆盖
           aging90:[0,20,35,0][idx],aging180:[0,0,10,0][idx]});
         DB.put('listings',{productId:p.id,title:p.name+' | 品牌+核心词+属性+卖点 (示例)',
           bullets:[1,1,1,1,0][idx],images:[7,7,5,6][idx],aPlus:[1,1,0,1][idx],

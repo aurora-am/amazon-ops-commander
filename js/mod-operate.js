@@ -12,6 +12,7 @@
     const prods=(await DB.all('products')).filter(p=>App.inScope(p.storeId));
     const PM=await pm(), SM=await sm();
     const ads=await DB.all('ads'), invs=await DB.all('inventory'), ls=await DB.all('listings');
+    const avg=await U.dailyAvgMap();
     const r=U.R(); const rows=[];
     if(tab==='ads'){
       ads.filter(a=>App.inScope(a.storeId)).forEach(a=>{
@@ -48,15 +49,16 @@
     }else if(tab==='inventory'){
       invs.forEach(i=>{
         const p=PM[i.productId]; if(!p||!App.inScope(p.storeId)) return;
+        const daily=avg[i.productId]!=null?avg[i.productId]:(Number(i.dailySalesAvg)||0);
         const avail=(Number(i.fbaQty)||0)+(Number(i.inboundQty)||0)-(Number(i.reserveQty)||0);
-        const cover=i.dailySalesAvg>0?avail/i.dailySalesAvg:null;
+        const cover=daily>0?avail/daily:null;
         let lv='green',txt='库存健康';
         if(cover==null){lv='gray';txt='缺少日均销量'}
         else if(cover<r.stockRed){lv='red';txt=`可售 ${cover.toFixed(0)} 天，最晚补货 ${U.addDays(U.today(),Math.max(0,Math.floor(cover)-(Number(i.leadDays)||0)))}`}
         else if(cover<r.stockYellow){lv='yellow';txt=`可售 ${cover.toFixed(0)} 天，需安排补货`}
         if((Number(i.aging180)||0)>0){lv='red';txt+=` · 库龄>180天 ${i.aging180} 件`}
         rows.push({obj:i,level:lv,target:`${p.sku} ${p.name}`,text:txt,
-          detail:`FBA ${i.fbaQty||0} · 在途 ${i.inboundQty||0} · 预留 ${i.reserveQty||0} · 日均 ${i.dailySalesAvg||0} · 周期 ${i.leadDays||0} 天`,link:'inventory'});
+          detail:`FBA ${i.fbaQty||0} · 在途 ${i.inboundQty||0} · 预留 ${i.reserveQty||0} · 日均 ${daily} · 周期 ${i.leadDays||0} 天`,link:'inventory'});
       });
     }else{
       (await DB.all('stores')).filter(s=>App.inScope(s.id)).forEach(s=>{
@@ -397,11 +399,14 @@
     const PM=await pm(), r=U.R();
     const invs=(await DB.all('inventory')).filter(i=>PM[i.productId]&&App.inScope(PM[i.productId].storeId));
     const plans=await DB.all('ship_plans');
+    // 日均销量：优先用 kpi_daily 近 30 天日均订单动态计算；无销售数据时才回退到录入兜底值
+    const avg=await U.dailyAvgMap();
     const rows=invs.map(i=>{
+      const dyn = avg[i.productId]!=null ? avg[i.productId] : (Number(i.dailySalesAvg)||0);
       const avail=(Number(i.fbaQty)||0)+(Number(i.inboundQty)||0)-(Number(i.reserveQty)||0);
-      const cover=i.dailySalesAvg>0?avail/i.dailySalesAvg:null;
-      const need=i.dailySalesAvg*(Number(i.leadDays)||0)*1.2;
-      return Object.assign({},i,{_sku:PM[i.productId].sku,_avail:avail,_cover:cover,
+      const cover=dyn>0?avail/dyn:null;
+      const need=dyn*(Number(i.leadDays)||0)*1.2;
+      return Object.assign({},i,{_sku:PM[i.productId].sku,_avail:avail,_cover:cover,_daily:dyn,_dyn:avg[i.productId]!=null,
         _lastOrder:cover==null?'—':U.addDays(U.today(),Math.max(0,Math.floor(cover)-(Number(i.leadDays)||0))),
         _suggest:Math.max(0,Math.round(need-avail))});
     });
@@ -413,12 +418,12 @@
         {label:'库龄>180 天',value:U.f0(rows.reduce((a,b)=>a+(Number(b.aging180)||0),0)),level:'alert'}
       ])+
       `<div class="card"><h3>库存台账与补货计算</h3>
-        <div class="sub">可售天数 = (FBA + 在途 - 预留) / 日均销量；建议补货量按补货周期 × 1.2 安全系数</div>
+        <div class="sub">可售天数 = (FBA + 在途 - 预留) / 日均销量；建议补货量按补货周期 × 1.2 安全系数。日均销量取自近 30 天日均订单，每日自动更新（kpi_daily 无数据时才用录入兜底值）</div>
         <div class="toolbar"><button class="btn" id="iAdd">新增库存记录</button>
           <button class="btn-ghost" id="iCsv">导出 CSV</button></div>`+
       U.table({cols:[
         {t:'SKU',k:'_sku'},{t:'FBA',k:'fbaQty',num:true},{t:'在途',k:'inboundQty',num:true},
-        {t:'预留',k:'reserveQty',num:true},{t:'日均',k:'dailySalesAvg',num:true},
+        {t:'预留',k:'reserveQty',num:true},{t:'日均(近30天)',num:true,f:x=>`${(Number(x._daily)||0).toFixed(1)}${x._dyn?'':' (兜底)'}`,num:true},
         {t:'可售天数',num:true,f:x=>x._cover==null?'—':x._cover.toFixed(0)+' 天 '+U.dot(x._cover<r.stockRed?'red':(x._cover<r.stockYellow?'yellow':'green'))},
         {t:'最晚补货',f:x=>U.esc(x._lastOrder)},{t:'建议补货',num:true,f:x=>U.f0(x._suggest)},
         {t:'库龄90/180',f:x=>`${x.aging90||0} / ${x.aging180||0}`}
@@ -438,13 +443,13 @@
       </div>`;
     const ifields=[{k:'productId',t:'产品',type:'select',opts:Object.values(PM).map(p=>({v:p.id,t:p.sku}))},
       {k:'fbaQty',t:'FBA 可售',type:'number'},{k:'inboundQty',t:'在途',type:'number'},
-      {k:'reserveQty',t:'预留',type:'number'},{k:'dailySalesAvg',t:'日均销量',type:'number',step:'0.1'},
+      {k:'reserveQty',t:'预留',type:'number'},{k:'dailySalesAvg',t:'日均销量兜底(近30天有数据时不生效)',type:'number',step:'0.1'},
       {k:'leadDays',t:'补货周期(天)',type:'number'},{k:'aging90',t:'库龄>90天件数',type:'number'},
       {k:'aging180',t:'库龄>180天件数',type:'number'}];
     root.querySelector('#iAdd').onclick=()=>U.modal({title:'新增库存记录',body:U.formFields(ifields),
       onOk:async b=>{await DB.put('inventory',U.formValues(b))},after:()=>App.refresh()});
     root.querySelector('#iCsv').onclick=()=>U.exportCSV('commander_inventory.csv',
-      rows.map(x=>({SKU:x._sku,FBA:x.fbaQty,在途:x.inboundQty,预留:x.reserveQty,日均:x.dailySalesAvg,
+      rows.map(x=>({SKU:x._sku,FBA:x.fbaQty,在途:x.inboundQty,预留:x.reserveQty,日均:x._daily,
         可售天数:x._cover==null?'':Math.round(x._cover),最晚补货:x._lastOrder,建议补货:x._suggest,
         库龄90:x.aging90||0,库龄180:x.aging180||0})),
       ['SKU','FBA','在途','预留','日均','可售天数','最晚补货','建议补货','库龄90','库龄180']);
