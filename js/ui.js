@@ -513,7 +513,7 @@
     let trend='';
     if(valid.length>=2){
       let mono=true;
-      for(let i=1;i<valid.length;i++){ if(valid[i]>=valid[i-1]){ mono=false; break; } }
+      for(let i=1;i<valid.length;i++){ if(valid[i]>valid[i-1]){ mono=false; break; } }
       if(mono) trend='增量产品';
     }
     // 容量大：存在有效季度排名 ≤ 阈值
