@@ -66,7 +66,7 @@
     const gross=price-buy; r.gross=+gross.toFixed(2);
     r.grossPct=price?+(gross/price*100).toFixed(2):null;
   }
-  // L4 选品利润指标（公式细节待确认）——已知项直接计算，依赖项留 TODO 占位
+  // L4 选品利润指标——按利润预估表2.0 口径对齐：commissionRmb=平台佣金$×汇率；amzShipRmb=FBA配送费$×汇率；taxRmb=关税$×汇率；netReceive=售价−佣金−FBA−预扣(广告+退货)。仓储其他/其他促销 模板有但 L4 暂未单列
   function computeProfitMetrics(r){
     // 汇率：记录级可编辑；未填时按货币从 U.RATES 取默认（USD 兜底 DEFAULT_RATE）
     if(r.rate==null || r.rate===''){
@@ -87,16 +87,23 @@
     const firstLeg=num(r.firstLegRmb)||0, cost=num(r.costRmb)||0;
     const preDeduct=num(r.preDeduct); const pd=(preDeduct==null)?priceRmb*(0.07+0.05):preDeduct; // 广告7%+退货5%
     const fx=num(r.fxLoss); const fl=(fx==null)?priceRmb*0.01:fx; // 汇损1% 占位（L4 待确认）
-    const profit=priceRmb-cost-firstLeg-(num(r.amzShipRmb)||0)-(num(r.taxRmb)||0)-(num(r.commissionRmb)||0)-pd-fl;
+    // —— 按利润预估表2.0 口径补全 L4 四项指标（模板：平台佣金$=售价$×佣金率%；FBA配送费$录入项；模板无税列，税=关税$×汇率）——
+    const commPct=num(r.commPct,15);                                  // 平台佣金率%（模板默认15%）
+    const commissionRmb=num(r.price)*commPct/100*rate;                 // 平台佣金$ × 汇率
+    const fbaFee$=num(r.fbaFee$);                                      // FBA配送费$（模板列G，直接录入）
+    const amzShipRmb=(fbaFee$!=null?fbaFee$:0)*rate;                   // 亚马逊配送费￥
+    const tariff$=num(r.tariff$);                                       // 关税$（美线进口税；模板无单列，参考 research 表 tariffUs）
+    const taxRmb=(tariff$!=null?tariff$:0)*rate;                       // 税/关税￥
+    const profit=priceRmb-cost-firstLeg-amzShipRmb-taxRmb-commissionRmb-pd-fl;
     r.priceRmb=+priceRmb.toFixed(2);
+    r.commissionRmb=+commissionRmb.toFixed(2);
+    r.amzShipRmb=+amzShipRmb.toFixed(2);
+    r.taxRmb=+taxRmb.toFixed(2);
     r.preDeduct=+pd.toFixed(2); r.fxLoss=+fl.toFixed(2);
     r.profitRmb=+profit.toFixed(2);
     r.profitRatio=priceRmb?+(profit/priceRmb*100).toFixed(2):null;
-    // TODO L4: taxRmb / commissionRmb / amzShipRmb / netReceive 的精确口径待用户确认后实现
-    if(r.taxRmb==null) r.taxRmb=null;
-    if(r.commissionRmb==null) r.commissionRmb=null;
-    if(r.amzShipRmb==null) r.amzShipRmb=null;
-    if(r.netReceive==null) r.netReceive=null;
+    // netReceive 后台到账 = 售价￥ − 佣金￥ − FBA￥ − 预扣(广告+退货)；不含采购/头程/关税/汇损（那些是成本与汇损，已计入 profitRmb）
+    r.netReceive=+((priceRmb-commissionRmb-amzShipRmb-pd)).toFixed(2);
   }
 
   /* ---------- 尺寸/币种解析辅助（供 profit 类 compute 调用 U.* 公式） ---------- */
@@ -586,7 +593,8 @@
       S('channel','渠道',['空运','专线','海运','铁运','卡航'].map(opt)),
       S('currency','货币',['美元','英镑','欧元','加元','墨西哥比索','日元'].map(opt)),
       N('price','商品售价'),N('weightG','单个重量/g'),N('freightPerG','货代/1g'),N('firstLegRmb','头程FBA运费/RMB'),
-      N('costRmb','商品成本/RMB'),N('rate','汇率',{ph:'未填则按币种取 U.RATES 默认'}),
+      N('costRmb','商品成本/RMB'),      N('rate','汇率',{ph:'未填则按币种取 U.RATES 默认'}),
+      N('commPct','平台佣金率%',{def:15}),N('fbaFee$','FBA配送费$'),N('tariff$','关税$'),
       R('priceRmb','兑换后售价/RMB',{f:r=>r.priceRmb==null?'—':U.money(r.priceRmb,'￥')}),
       R('profitRmb','利润/RMB',{f:r=>r.profitRmb==null?'—':U.money(r.profitRmb,'￥')}),
       R('profitRatio','利润比%',{f:r=>r.profitRatio==null?'—':U.pct(r.profitRatio)}),
