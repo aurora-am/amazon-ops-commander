@@ -243,7 +243,11 @@
       `<span class="muted">${has?esc(url):'（无图，录入图片 URL）'}</span></div>`;
   }
   function exportXLSX(filename, sheets){
-    if(!window.XLSX){ toast('SheetJS 未加载，仅可导出 CSV'); return; }
+    if(!window.XLSX){
+      toast('SheetJS 未加载，已自动降级导出 CSV');
+      (sheets||[]).forEach(s=> exportCSV((filename||'export')+'-'+(s.name||'sheet')+'.csv', s.rows||[], s.headers||[]));
+      return;
+    }
     const wb=XLSX.utils.book_new();
     (sheets||[]).forEach(s=>{
       const aoa=[s.headers.map(h=>h.label)];
@@ -266,7 +270,7 @@
     const profitRmb=profit*rate;
     const breakEvenAcos=price?
       (price-(purchase+firstLeg+fbaFee+commission+refund+storageOther+promo))/price*100:null;
-    return {cost$,cost,profit$,profit,netPct,profitRmb,breakEvenAcos};
+    return {cost$:cost, profit$:profit, netPct, profitRmb, breakEvenAcos};
   }
   /* =====================================================================
    * B3：FBA 配送费费率表（美国站 2026-01-15 生效，非旺季/非服装/非危险品/$10-50 价格带口径）
