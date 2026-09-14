@@ -19,12 +19,13 @@ html = html.replace(/<link rel="stylesheet" href="([^"?]+)(?:\?[^"]*)?">/g, (m, 
   return `<style>\n/* ${href} */\n${css}\n</style>`;
 });
 
-// 内联 JS（按 src 顺序保留，vendor 也内联）
-html = html.replace(/<script src="([^"?]+)(?:\?[^"]*)?"><\/script>/g, (m, src) => {
+// 内联 JS：只内联应用自己的 js/*.js，vendor 保持外链（避免首页过大导致 Pages 刷新慢）
+html = html.replace(/<script src="(js\/[^"?]+)(?:\?[^"]*)?"><\/script>/g, (m, src) => {
   const fp = path.join(ROOT, src);
   const js = fs.readFileSync(fp, 'utf8');
   return `<script>\n/* ${src} */\n${js}\n</script>`;
 });
+// vendor 资源保留原外链（仍带 v=2），如果国内被墙这部分只会影响图表/导出，页面主体能渲染
 
 // 增加 noscript + JS 加载失败兜底提示
 const fallback = `
