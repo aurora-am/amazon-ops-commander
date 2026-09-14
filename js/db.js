@@ -149,6 +149,8 @@
       ];
       pids=[];
       for(const p of prods){ const id=await DB.put('products',p); pids.push({id,...p}); }
+      // 批量生成 kpi_daily：365 天 × 4 品 = 1460 条，必须一次事务 bulk 写入，否则 1460 个并发 put 会卡死浏览器
+      const kpiRows=[];
       for(let i=364;i>=0;i--){
         pids.forEach((p,idx)=>{
           const d=new Date(today); d.setDate(d.getDate()-i);
@@ -158,33 +160,42 @@
           const adSpend=+(sales*rnd(8,24)/100).toFixed(2);
           const adSales=+(adSpend*(1.6+rnd(0,28)/10)).toFixed(2);
           const sessions=Math.round(orders/(0.06+rnd(0,60)/1000)*1);
-          DB.put('kpi_daily',{storeId:p.storeId,productId:p.id,date:d.toISOString().slice(0,10),
+          kpiRows.push({storeId:p.storeId,productId:p.id,date:d.toISOString().slice(0,10),
             sessions,orders,sales,cvr:+(orders/sessions*100).toFixed(2),aov:+(sales/orders).toFixed(2),
             adSpend,adSales,acos:adSales?+(adSpend/adSales*100).toFixed(2):null,
             refunds:rnd(0,Math.max(1,Math.round(orders*.06))),
             refundRate:+(rnd(0,60)/10).toFixed(2)});
         });
       }
+      await DB.bulk('kpi_daily',kpiRows);
+      const adsRows=[], invRows=[], listRows=[];
       pids.forEach((p,idx)=>{
-        DB.put('ads',{storeId:p.storeId,productId:p.id,name:(idx%2?'SP-自动':'SP-手动核心词')+' '+p.sku,
+        adsRows.push({storeId:p.storeId,productId:p.id,name:(idx%2?'SP-自动':'SP-手动核心词')+' '+p.sku,
           campaignType:idx%2?'SP-Auto':'SP-Manual',dailyBudget:30+idx*10,spend:[120,90,60,45][idx],
           sales:[430,260,150,120][idx],impressions:[12000,9000,5000,3000][idx],clicks:[210,150,70,45][idx],
           date:today.toISOString().slice(0,10)});
-        DB.put('inventory',{productId:p.id,fbaQty:[180,320,90,240][idx],inboundQty:[0,120,60,0][idx],
+        invRows.push({productId:p.id,fbaQty:[180,320,90,240][idx],inboundQty:[0,120,60,0][idx],
           reserveQty:[10,15,5,8][idx],dailySalesAvg:[42,30,18,12][idx],leadDays:[45,45,35,40][idx], // dailySalesAvg 现为兜底值：kpi_daily 有该品近30天数据时由页面动态覆盖
           aging90:[0,20,35,0][idx],aging180:[0,0,10,0][idx]});
-        DB.put('listings',{productId:p.id,title:p.name+' | 品牌+核心词+属性+卖点 (示例)',
+        listRows.push({productId:p.id,title:p.name+' | 品牌+核心词+属性+卖点 (示例)',
           bullets:[1,1,1,1,0][idx],images:[7,7,5,6][idx],aPlus:[1,1,0,1][idx],
           keywords:'收纳 折叠 家居 整理',cvrBaseline:[8.5,7.2,4.1,5.6][idx],lastAudit:null});
       });
-      DB.put('reviews',{productId:pids[0].id,date:today.toISOString().slice(0,10),rating:1,
-        sentiment:'负',reasonTags:'尺寸,描述不符',quote:'比图片里小很多，装不下被子',actionTaken:''});
-      DB.put('reviews',{productId:pids[2].id,date:today.toISOString().slice(0,10),rating:2,
-        sentiment:'负',reasonTags:'质量,物流',quote:'灯座松动，外箱压变形',actionTaken:''});
-      DB.put('compliance',{storeId:stores[1].id,item:'CE 认证（LED 台灯）',region:'EU',
-        expireDate:'2027-05-31',status:'有效',reminderDays:90});
-      DB.put('compliance',{storeId:stores[0].id,item:'品牌商标 US',region:'US',
-        expireDate:'2026-11-30',status:'有效',reminderDays:60});
+      await DB.bulk('ads',adsRows);
+      await DB.bulk('inventory',invRows);
+      await DB.bulk('listings',listRows);
+      await DB.bulk('reviews',[
+        {productId:pids[0].id,date:today.toISOString().slice(0,10),rating:1,
+          sentiment:'负',reasonTags:'尺寸,描述不符',quote:'比图片里小很多，装不下被子',actionTaken:''},
+        {productId:pids[2].id,date:today.toISOString().slice(0,10),rating:2,
+          sentiment:'负',reasonTags:'质量,物流',quote:'灯座松动，外箱压变形',actionTaken:''}
+      ]);
+      await DB.bulk('compliance',[
+        {storeId:stores[1].id,item:'CE 认证（LED 台灯）',region:'EU',
+          expireDate:'2027-05-31',status:'有效',reminderDays:90},
+        {storeId:stores[0].id,item:'品牌商标 US',region:'US',
+          expireDate:'2026-11-30',status:'有效',reminderDays:60}
+      ]);
       const y=today.getFullYear();
       await DB.bulk('nodes', genNodes('US',y).concat(genNodes('EU',y),genNodes('JP',y),genNodes('US',y+1)));
       DB.put('tasks',{source:'节点',title:'黑五网一提报：确认 Deal 资格与活动价',priority:'红',

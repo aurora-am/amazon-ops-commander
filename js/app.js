@@ -143,6 +143,7 @@
     const rules=await DB.getSetting('rules',null);
     if(rules) U.setRules(rules);
     await renderStorePicker();
+    document.querySelector('#content').innerHTML='<div class="empty">正在初始化演示数据，请稍候…</div>';
     const seeded=await window.DBSeed();
     if(seeded){
       const stores=await DB.all('stores');
