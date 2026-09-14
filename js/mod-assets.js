@@ -346,9 +346,9 @@
       {k:'targetAcos',t:'目标ACOS(0-1)',type:'number',step:'0.01',def:0.25}
     ];
     const cols=[{t:'产品',k:'name'},{t:'SKU',k:'sku'},{t:'售价',k:'price',num:1,f:U.money},
-      {t:'净利',k:'x',num:1,f:(v,r)=>U.money(r._net)},
-      {t:'净利率',k:'x',num:1,f:(v,r)=>U.tag(U.pct(r._margin),U.marginColor(r._margin))},
-      {t:'保本ACOS',k:'x',num:1,f:(v,r)=>U.pct(r._be)}];
+      {t:'净利',k:'x',num:1,f:r=>U.money(r._net)},
+      {t:'净利率',k:'x',num:1,f:r=>U.tag(U.pct(r._margin),U.marginColor(r._margin))},
+      {t:'保本ACOS',k:'x',num:1,f:r=>U.pct(r._be)}];
     const draw=async()=>{
       const ps=await DB.all('products');
       root.querySelector('#t').innerHTML=U.table({cols,
@@ -371,11 +371,11 @@
   };
 
   P.finance=async root=>{
-    const cols=[{t:'年月',k:'ym',f:(v,r)=>r.year+'-'+String(r.month).padStart(2,'0')},
+    const cols=[{t:'年月',k:'ym',f:r=>r.year+'-'+String(r.month).padStart(2,'0')},
       {t:'收入$',k:'revenue',num:1,f:U.money},{t:'产品成本$',k:'productCost',num:1,f:U.money},
       {t:'头程$',k:'headFreight',num:1,f:U.money},{t:'佣金$',k:'commission',num:1,f:U.money},
       {t:'FBA$',k:'fbaFee',num:1,f:U.money},{t:'广告$',k:'adSpend',num:1,f:U.money},
-      {t:'退款$',k:'refunds',num:1,f:U.money},{t:'净利$',k:'netProfit',num:1,f:v=>U.tag(U.money(v),v>=0?'green':'red')}];
+      {t:'退款$',k:'refunds',num:1,f:U.money},{t:'净利$',k:'netProfit',num:1,f:r=>U.tag(U.money(r.netProfit),r.netProfit>=0?'green':'red')}];
     const fields=[{k:'year',t:'年',type:'number'},{k:'month',t:'月',type:'number'},{k:'revenue',t:'收入$',type:'number'},
       {k:'productCost',t:'产品成本￥',type:'number'},{k:'headFreight',t:'头程￥',type:'number'},
       {k:'commission',t:'佣金$',type:'number'},{k:'fbaFee',t:'FBA$',type:'number'},
@@ -432,7 +432,7 @@
 
   P.team=async root=>{
     const cols=[{t:'成员',k:'member'},{t:'角色',k:'role'},{t:'负责店铺',k:'stores'},{t:'职责',k:'duty'},
-      {t:'状态',k:'status',f:v=>U.tag(v,v==='在职'?'green':(v==='请假'?'yellow':'gray'))}];
+      {t:'状态',k:'status',f:r=>U.tag(r.status,r.status==='在职'?'green':(r.status==='请假'?'yellow':'gray'))}];
     const fields=[{k:'member',t:'成员'},{k:'role',t:'角色'},{k:'stores',t:'负责店铺'},
       {k:'duty',t:'职责'},{k:'status',t:'状态',type:'select',opts:[{v:'在职',t:'在职'},{v:'请假',t:'请假'},{v:'离职',t:'离职'}]}];
     const draw=async()=>root.querySelector('#t').innerHTML=U.table({cols,rows:await DB.all('team'),
@@ -455,8 +455,8 @@
     const render=kind=>{
       const rows=kind==='全部'?all:all.filter(x=>x.kind===kind);
       root.querySelector('#t').innerHTML=U.table({cols:[
-        {t:'类型',k:'kind',f:v=>U.tag(v,'blue')},{t:'名称',k:'title'},
-        {t:'内容 / 链接',k:'content',raw:1,f:(v,r)=>r.link?`<a href="${U.esc(r.link)}" target="_blank" style="color:var(--blue)">${U.esc(r.title)}</a> · ${U.esc(r.content)}`:U.esc(r.content)}
+        {t:'类型',k:'kind',f:r=>U.tag(r.kind,'blue')},{t:'名称',k:'title'},
+        {t:'内容 / 链接',k:'content',f:r=>r.link?`<a href="${U.esc(r.link)}" target="_blank" style="color:var(--blue)">${U.esc(r.title)}</a> · ${U.esc(r.content)}`:U.esc(r.content)}
       ],rows,actions:r=>`<button class="btn-ghost btn-sm" data-e="${r.id}">编辑</button><button class="btn-ghost btn-sm" data-d="${r.id}">删</button>`});
     };
     const fields=[{k:'kind',t:'类型'},{k:'title',t:'名称'},{k:'content',t:'内容',type:'textarea'},{k:'link',t:'链接(可选)'}];

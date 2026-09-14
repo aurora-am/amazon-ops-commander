@@ -318,6 +318,25 @@
       return {c:'green',t:`剩 ${d} 天`,d};
     };
     nodes.sort((a,b)=>a.deadline<b.deadline?-1:1);
+    const isPast=n=>{ const s=st(n); return s.t==='已完成'||s.t==='已逾期'; };
+    const active=nodes.filter(n=>!isPast(n));
+    const past=nodes.filter(n=>isPast(n));
+    const nodeCard=n=>{
+      const s=st(n);
+      return `<div class="node ${s.c==='red'?'red':(s.c==='yellow'?'yellow':'')} ${isPast(n)?'over':''}">
+        <div style="font-size:12px;color:var(--ink2)">${n.site} · ${n.year}</div>
+        <div style="font-size:15px;font-weight:600;margin:4px 0">${U.esc(n.eventName)}</div>
+        <div class="nd">${n.type}</div>
+        <div style="font-size:12px;color:var(--ink2)">截止 ${n.deadline}</div>
+        <div style="margin:6px 0">${U.tag(s.t,s.c)}</div>
+        <div style="font-size:12px;color:var(--ink2);line-height:1.5">${U.esc(n.actionGuide||'')}</div>
+        <div style="margin-top:8px;display:flex;gap:6px">
+          <button class="btn-ghost btn-sm" data-done="${n.id}">${n.done?'标未完成':'标记完成'}</button>
+          <button class="btn-ghost btn-sm" data-nav="${n.linkedModule||'stores'}">去对应模块</button>
+          <button class="btn-ghost btn-sm" data-delnode="${n.id}">删除</button>
+        </div>
+      </div>`;
+    };
     root.innerHTML=
       `<div class="card"><h3>旺季节点倒计时</h3>
         <div class="sub">节点库按站点与年份生成，系统只记节点与倒推，提报与备货决策由你判断</div>
@@ -328,21 +347,11 @@
           <button class="btn-ghost" id="nAdd">新增自定义节点</button>
           <button class="btn-ghost" id="nCsv">导出 CSV</button>
         </div>
-        <div class="grid g3">${nodes.map(n=>{
-          const s=st(n);
-          return `<div class="node ${s.c==='red'?'red':(s.c==='yellow'?'yellow':'')} ${s.t==='已逾期'||s.t==='已完成'?'over':''}">
-            <div style="font-size:12px;color:var(--ink2)">${n.site} · ${n.year}</div>
-            <div style="font-size:15px;font-weight:600;margin:4px 0">${U.esc(n.eventName)}</div>
-            <div class="nd">${n.type}</div>
-            <div style="font-size:12px;color:var(--ink2)">截止 ${n.deadline}</div>
-            <div style="margin:6px 0">${U.tag(s.t,s.c)}</div>
-            <div style="font-size:12px;color:var(--ink2);line-height:1.5">${U.esc(n.actionGuide||'')}</div>
-            <div style="margin-top:8px;display:flex;gap:6px">
-              <button class="btn-ghost btn-sm" data-done="${n.id}">${n.done?'标未完成':'标记完成'}</button>
-              <button class="btn-ghost btn-sm" data-nav="${n.linkedModule||'stores'}">去对应模块</button>
-              <button class="btn-ghost btn-sm" data-delnode="${n.id}">删除</button>
-            </div>
-          </div>`}).join('')||`<div class="empty">该站点/年份暂无节点，点击「生成/补齐节点」</div>`}</div>
+        <div class="grid g3">${active.map(nodeCard).join('')||`<div class="empty">该站点/年份暂无待办节点，点击「生成/补齐节点」</div>`}</div>
+        ${past.length?`<details class="fold-card" style="margin-top:14px">
+          <summary style="font-size:14px;font-weight:600;cursor:pointer;padding:10px 0;user-select:none">已截止节点 (${past.length})</summary>
+          <div class="grid g3" style="margin-top:8px">${past.map(nodeCard).join('')}</div>
+        </details>`:''}
       </div>
       <div class="card"><h3>旺季同期对比（销售额 vs 广告花费）</h3>
         <div class="sub">对比当前筛选区间与上一年同区间；历史不足时显示仅本期</div>
@@ -428,7 +437,7 @@
         {t:'级别',k:'priority',f:r=>U.dot(lv[r.priority]||'gray')+' '+U.esc(r.priority||'')},
         {t:'来源',k:'source'},
         {t:'事项',k:'title'},
-        {t:'截止',k:'dueDate',f:r=>{
+        {t:'截止',k:'dueDate',raw:1,f:r=>{
           const d=U.diffDays(r.dueDate,U.today());
           if(r.done) return U.esc(r.dueDate||'—');
           if(d<0) return U.esc(r.dueDate)+' '+U.tag('逾期','red');

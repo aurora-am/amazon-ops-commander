@@ -343,7 +343,7 @@
       U.table({cols:[
         {t:'SKU',k:'_sku'},{t:'活动',k:'name'},{t:'类型',k:'campaignType'},
         {t:'花费',num:true,f:r=>U.money(r.spend)},{t:'销售',num:true,f:r=>U.money(r.sales)},
-        {t:'ACOS',num:true,f:r=>U.pct(r._acos)+' '+U.dot(r._acos==null?'gray':(r._be!=null&&r._acos>r._be?'red':'green'))},
+        {t:'ACOS',num:true,raw:1,f:r=>U.pct(r._acos)+' '+U.dot(r._acos==null?'gray':(r._be!=null&&r._acos>r._be?'red':'green'))},
         {t:'保本ACOS',num:true,f:r=>U.pct(r._be)},
         {t:'CTR',num:true,f:r=>U.pct(r._ctr)},{t:'CPC',num:true,f:r=>U.money(r._cpc)}
       ],rows,empty:'暂无广告数据',
@@ -424,7 +424,7 @@
       U.table({cols:[
         {t:'SKU',k:'_sku'},{t:'FBA',k:'fbaQty',num:true},{t:'在途',k:'inboundQty',num:true},
         {t:'预留',k:'reserveQty',num:true},{t:'日均(近30天)',num:true,f:x=>`${(Number(x._daily)||0).toFixed(1)}${x._dyn?'':' (兜底)'}`,num:true},
-        {t:'可售天数',num:true,f:x=>x._cover==null?'—':x._cover.toFixed(0)+' 天 '+U.dot(x._cover<r.stockRed?'red':(x._cover<r.stockYellow?'yellow':'green'))},
+        {t:'可售天数',num:true,raw:1,f:x=>x._cover==null?'—':x._cover.toFixed(0)+' 天 '+U.dot(x._cover<r.stockRed?'red':(x._cover<r.stockYellow?'yellow':'green'))},
         {t:'最晚补货',f:x=>U.esc(x._lastOrder)},{t:'建议补货',num:true,f:x=>U.f0(x._suggest)},
         {t:'库龄90/180',f:x=>`${x.aging90||0} / ${x.aging180||0}`}
       ],rows,empty:'暂无库存数据',
@@ -686,9 +686,9 @@
   /* ============ 新增 SOP 页面：库存/售后/推广 ============ */
   P.purchase=async root=>{
     const cols=[{t:'供应商',k:'supplier'},{t:'SKU',k:'sku'},{t:'产品',k:'productName'},
-      {t:'数量',k:'qty',num:1},{t:'单价￥',k:'unitPrice',num:1,f:v=>U.money(v,'￥')},
-      {t:'金额￥',k:'amount',num:1,f:v=>U.money(v,'￥')},{t:'下单日',k:'orderDate'},{t:'预计到货',k:'etaDate'},
-      {t:'状态',k:'status',f:v=>U.tag(v,v==='已到货'?'green':(v==='在途'?'yellow':'gray'))}];
+      {t:'数量',k:'qty',num:1},{t:'单价￥',k:'unitPrice',num:1,f:r=>U.money(r.unitPrice,'￥')},
+      {t:'金额￥',k:'amount',num:1,f:r=>U.money(r.amount,'￥')},{t:'下单日',k:'orderDate'},{t:'预计到货',k:'etaDate'},
+      {t:'状态',k:'status',f:r=>U.tag(r.status,r.status==='已到货'?'green':(r.status==='在途'?'yellow':'gray'))}];
     const fields=[{k:'supplier',t:'供应商'},{k:'sku',t:'SKU'},{k:'productName',t:'产品名称'},
       {k:'qty',t:'数量',type:'number'},{k:'unitPrice',t:'单价(￥)',type:'number',step:'0.1'},
       {k:'orderDate',t:'下单日',type:'date'},{k:'etaDate',t:'预计到货',type:'date'},
@@ -730,7 +730,7 @@
 
   P.qc=async root=>{
     const cols=[{t:'SKU',k:'sku'},{t:'产品',k:'productName'},{t:'质检项目',k:'item'},
-      {t:'标准',k:'standard'},{t:'结果',k:'result',f:v=>U.tag(v,v==='合格'?'green':(v==='不合格'?'red':'yellow'))},
+      {t:'标准',k:'standard'},{t:'结果',k:'result',f:r=>U.tag(r.result,r.result==='合格'?'green':(r.result==='不合格'?'red':'yellow'))},
       {t:'日期',k:'date'},{t:'质检员',k:'inspector'}];
     const fields=[{k:'sku',t:'SKU'},{k:'productName',t:'产品名称'},{k:'item',t:'质检项目'},
       {k:'standard',t:'标准'},{k:'result',t:'结果',type:'select',opts:[{v:'合格',t:'合格'},{v:'不合格',t:'不合格'},{v:'待检',t:'待检'}]},
@@ -751,9 +751,9 @@
 
   P.newlaunch=async root=>{
     const prods=await DB.all('products'); const pm={}; prods.forEach(p=>pm[p.id]=p.name);
-    const cols=[{t:'产品',k:'pid',f:(v,r)=>pm[r.productId]||pm[+r.productId]||('#'+r.productId)},
+    const cols=[{t:'产品',k:'pid',f:r=>pm[r.productId]||pm[+r.productId]||('#'+r.productId)},
       {t:'阶段',k:'phase'},{t:'周次',k:'week',num:1},{t:'动作',k:'action'},
-      {t:'目标',k:'target'},{t:'实际',k:'actual'},{t:'状态',k:'status',f:v=>U.tag(v,v==='已完成'?'green':(v==='进行中'?'yellow':'gray'))}];
+      {t:'目标',k:'target'},{t:'实际',k:'actual'},{t:'状态',k:'status',f:r=>U.tag(r.status,r.status==='已完成'?'green':(r.status==='进行中'?'yellow':'gray'))}];
     const fields=[{k:'productId',t:'产品',type:'select',opts:prods.map(p=>({v:p.id,t:p.name}))},
       {k:'phase',t:'阶段',type:'select',opts:[{v:'准备期',t:'准备期'},{v:'爆发期1',t:'爆发期1'},{v:'爆发期2',t:'爆发期2'},{v:'稳定期',t:'稳定期'}]},
       {k:'week',t:'周次',type:'number'},{k:'action',t:'动作'},{k:'target',t:'目标'},{k:'actual',t:'实际'},
@@ -773,8 +773,8 @@
   };
 
   P.appeal=async root=>{
-    const cols=[{t:'类型',k:'type',f:v=>U.tag(v,'blue')},{t:'场景',k:'scene'},{t:'模板标题',k:'title'},
-      {t:'模板内容',k:'body',raw:1,f:v=>'<span style="font-size:12px;color:var(--ink2)">'+U.esc(String(v||'').slice(0,60))+(String(v||'').length>60?'…':'')+'</span>'}];
+    const cols=[{t:'类型',k:'type',f:r=>U.tag(r.type,'blue')},{t:'场景',k:'scene'},{t:'模板标题',k:'title'},
+      {t:'模板内容',k:'body',raw:1,f:r=>'<span style="font-size:12px;color:var(--ink2)">'+U.esc(String(r.body||'').slice(0,60))+(String(r.body||'').length>60?'…':'')+'</span>'}];
     const fields=[{k:'type',t:'类型'},{k:'scene',t:'场景'},{k:'title',t:'模板标题'},{k:'body',t:'模板内容',type:'textarea'}];
     const draw=async()=>root.querySelector('#t').innerHTML=U.table({cols,rows:await DB.all('appeal'),
       actions:r=>`<button class="btn-ghost btn-sm" data-e="${r.id}">编辑</button><button class="btn-ghost btn-sm" data-d="${r.id}">删</button>`});
@@ -791,8 +791,8 @@
   };
 
   P.reply=async root=>{
-    const cols=[{t:'类型',k:'type',f:v=>U.tag(v,'blue')},{t:'场景',k:'scene'},
-      {t:'话术',k:'body',raw:1,f:v=>'<span style="font-size:12px;color:var(--ink2)">'+U.esc(String(v||'').slice(0,60))+(String(v||'').length>60?'…':'')+'</span>'}];
+    const cols=[{t:'类型',k:'type',f:r=>U.tag(r.type,'blue')},{t:'场景',k:'scene'},
+      {t:'话术',k:'body',raw:1,f:r=>'<span style="font-size:12px;color:var(--ink2)">'+U.esc(String(r.body||'').slice(0,60))+(String(r.body||'').length>60?'…':'')+'</span>'}];
     const fields=[{k:'type',t:'类型'},{k:'scene',t:'场景'},{k:'body',t:'话术内容',type:'textarea'}];
     const draw=async()=>root.querySelector('#t').innerHTML=U.table({cols,rows:await DB.all('reply'),
       actions:r=>`<button class="btn-ghost btn-sm" data-e="${r.id}">编辑</button><button class="btn-ghost btn-sm" data-d="${r.id}">删</button>`});
@@ -811,7 +811,7 @@
   P.influencer=async root=>{
     const cols=[{t:'红人',k:'name'},{t:'平台',k:'platform'},{t:'粉丝',k:'fans',num:1,f:U.f0},
       {t:'领域',k:'niche'},{t:'报价$',k:'quote',num:1,f:U.money},
-      {t:'状态',k:'status',f:v=>U.tag(v,v==='已合作'?'green':(v==='联系中'?'yellow':'gray'))},{t:'备注',k:'note'}];
+      {t:'状态',k:'status',f:r=>U.tag(r.status,r.status==='已合作'?'green':(r.status==='联系中'?'yellow':'gray'))},{t:'备注',k:'note'}];
     const fields=[{k:'name',t:'红人'},{k:'platform',t:'平台',type:'select',opts:[{v:'Instagram',t:'Instagram'},{v:'YouTube',t:'YouTube'},{v:'TikTok',t:'TikTok'}]},
       {k:'fans',t:'粉丝数',type:'number'},{k:'niche',t:'领域'},{k:'quote',t:'报价($)',type:'number',step:'1'},
       {k:'status',t:'状态',type:'select',opts:[{v:'联系中',t:'联系中'},{v:'已合作',t:'已合作'},{v:'已结束',t:'已结束'},{v:'待定',t:'待定'}]},{k:'note',t:'备注',type:'textarea'}];

@@ -9,7 +9,6 @@
       {k:'tasks',t:'待办事项'},
       {k:'patrol',t:'每日巡店'},
       {k:'stores',t:'店铺与站点'},
-      {k:'toolbox',t:'工具箱',star:1},
       {k:'data',t:'数据与备份'},
       {k:'settings',t:'设置与阈值'}
     ]},
@@ -22,7 +21,6 @@
       {k:'keywords',t:'关键词词库'},
       {k:'listing',t:'Listing 优化'},
       {k:'ads',t:'广告管理'},
-      {k:'newlaunch',t:'新品推广节奏',star:1},
       {k:'peak',t:'大促时间表'}
     ]},
     {g:'库存管理',items:[

@@ -102,7 +102,9 @@
       (opts.actions?`<th style="width:120px">操作</th>`:'')+`</tr></thead><tbody>`+
       rows.map(r=>`<tr>`+cols.map(c=>{
         const v=(c.f?c.f(r):r[c.k]);
-        return `<td class="${c.num?'num':''}">${c.raw?String(v==null?'':v):esc(v==null?'—':v)}</td>`;
+        const isHtml=typeof v==='string' && /^\s*</.test(v);
+        const raw=c.raw || isHtml;
+        return `<td class="${c.num?'num':''}">${raw?String(v==null?'':v):esc(v==null?'—':v)}</td>`;
       }).join('')+(opts.actions?`<td>${opts.actions(r)}</td>`:'')+`</tr>`).join('')+
       `</tbody></table></div>`;
   }
