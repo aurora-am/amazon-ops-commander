@@ -749,29 +749,6 @@
     };
   };
 
-  P.newlaunch=async root=>{
-    const prods=await DB.all('products'); const pm={}; prods.forEach(p=>pm[p.id]=p.name);
-    const cols=[{t:'产品',k:'pid',f:r=>pm[r.productId]||pm[+r.productId]||('#'+r.productId)},
-      {t:'阶段',k:'phase'},{t:'周次',k:'week',num:1},{t:'动作',k:'action'},
-      {t:'目标',k:'target'},{t:'实际',k:'actual'},{t:'状态',k:'status',f:r=>U.tag(r.status,r.status==='已完成'?'green':(r.status==='进行中'?'yellow':'gray'))}];
-    const fields=[{k:'productId',t:'产品',type:'select',opts:prods.map(p=>({v:p.id,t:p.name}))},
-      {k:'phase',t:'阶段',type:'select',opts:[{v:'准备期',t:'准备期'},{v:'爆发期1',t:'爆发期1'},{v:'爆发期2',t:'爆发期2'},{v:'稳定期',t:'稳定期'}]},
-      {k:'week',t:'周次',type:'number'},{k:'action',t:'动作'},{k:'target',t:'目标'},{k:'actual',t:'实际'},
-      {k:'status',t:'状态',type:'select',opts:[{v:'未开始',t:'未开始'},{v:'进行中',t:'进行中'},{v:'已完成',t:'已完成'},{v:'滞后',t:'滞后'}]}];
-    const draw=async()=>root.querySelector('#t').innerHTML=U.table({cols,rows:await DB.all('newlaunch'),
-      actions:r=>`<button class="btn-ghost btn-sm" data-e="${r.id}">编辑</button><button class="btn-ghost btn-sm" data-d="${r.id}">删</button>`});
-    root.innerHTML=`${U.card('新品推广节奏','按准备期→爆发期→稳定期跟踪动作、目标与实际，及时发现滞后','')}
-      <div class="toolbar"><button class="btn" id="add">+ 新增节奏</button></div><div id="t"></div>`;
-    await draw();
-    root.querySelector('#add').onclick=()=>U.modal({title:'新增推广节奏',body:U.formFields(fields),
-      onOk:b=>{DB.put('newlaunch',U.formValues(b)).then(draw).then(()=>U.toast('已添加'))}});
-    root.querySelector('#t').onclick=async e=>{const ed=e.target.dataset.e,dl=e.target.dataset.d;
-      if(dl)U.confirmBox('删除？',async()=>{await DB.del('newlaunch',Number(dl));await draw()});
-      if(ed){const r=await DB.get('newlaunch',Number(ed));U.modal({title:'编辑',body:U.formFields(fields,r),
-        onOk:b=>{Object.assign(r,U.formValues(b));DB.put('newlaunch',r).then(draw).then(()=>U.toast('已保存'))}})};
-    };
-  };
-
   P.appeal=async root=>{
     const cols=[{t:'类型',k:'type',f:r=>U.tag(r.type,'blue')},{t:'场景',k:'scene'},{t:'模板标题',k:'title'},
       {t:'模板内容',k:'body',raw:1,f:r=>'<span style="font-size:12px;color:var(--ink2)">'+U.esc(String(r.body||'').slice(0,60))+(String(r.body||'').length>60?'…':'')+'</span>'}];

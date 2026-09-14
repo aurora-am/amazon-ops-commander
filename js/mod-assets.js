@@ -449,30 +449,5 @@
     };
   };
 
-  P.toolbox=async root=>{
-    const all=await DB.all('toolbox');
-    const kinds=['全部',...Array.from(new Set(all.map(x=>x.kind)))];
-    const render=kind=>{
-      const rows=kind==='全部'?all:all.filter(x=>x.kind===kind);
-      root.querySelector('#t').innerHTML=U.table({cols:[
-        {t:'类型',k:'kind',f:r=>U.tag(r.kind,'blue')},{t:'名称',k:'title'},
-        {t:'内容 / 链接',k:'content',f:r=>r.link?`<a href="${U.esc(r.link)}" target="_blank" style="color:var(--blue)">${U.esc(r.title)}</a> · ${U.esc(r.content)}`:U.esc(r.content)}
-      ],rows,actions:r=>`<button class="btn-ghost btn-sm" data-e="${r.id}">编辑</button><button class="btn-ghost btn-sm" data-d="${r.id}">删</button>`});
-    };
-    const fields=[{k:'kind',t:'类型'},{k:'title',t:'名称'},{k:'content',t:'内容',type:'textarea'},{k:'link',t:'链接(可选)'}];
-    root.innerHTML=`${U.card('工具箱','AI 提示词、实用网站、发票模板等运营资产集中管理','')}
-      <div class="toolbar" style="flex-wrap:wrap">${kinds.map(k=>`<button class="btn-ghost btn-sm" data-k="${k}">${U.esc(k)}</button>`).join('')}
-        <button class="btn" id="add" style="margin-left:auto">+ 新增</button></div><div id="t"></div>`;
-    render('全部');
-    root.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>render(b.dataset.k));
-    root.querySelector('#add').onclick=()=>U.modal({title:'新增工具',body:U.formFields(fields),
-      onOk:b=>{DB.put('toolbox',U.formValues(b)).then(()=>location.reload())}});
-    root.querySelector('#t').onclick=async e=>{const ed=e.target.dataset.e,dl=e.target.dataset.d;
-      if(dl)U.confirmBox('删除？',async()=>{await DB.del('toolbox',Number(dl));location.reload()});
-      if(ed){const r=await DB.get('toolbox',Number(ed));U.modal({title:'编辑',body:U.formFields(fields,r),
-        onOk:b=>{Object.assign(r,U.formValues(b));DB.put('toolbox',r).then(()=>location.reload())}})};
-    };
-  };
-
   window.Pages=Object.assign(window.Pages||{},P);
 })();
