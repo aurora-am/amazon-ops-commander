@@ -531,19 +531,19 @@
   /* 近 30 天日均销量（代理口径：kpi_daily 日均订单数），用于库存可售天数动态计算。
    * kpi_daily 无独立「销量件数」字段，以每日 orders 作销量代理；近 30 天(含今天)按 productId 求均值。
    * 返回 {productId: 日均}，无销售数据的品不出现在 map 中（调用方回退到录入兜底值）。 */
-  U.dailyAvgMap=async function(){
+  async function dailyAvgMap(){
     const DBg=window.DB; // db.js 的 DB 仅挂到 window.DB，跨 IIFE 须显式取
     if(!DBg||!DBg.all) return {};
     let kpi=[];
     try{ kpi=await DBg.all('kpi_daily'); }catch(e){ kpi=[]; }
-    const from=U.addDays(U.today(),-29);
-    const to=U.today();
+    const from=addDays(today(),-29);
+    const to=today();
     const sum={},cnt={};
     kpi.forEach(k=>{ if(k.date>=from&&k.date<=to){
       const p=k.productId; sum[p]=(sum[p]||0)+(Number(k.orders)||0); cnt[p]=(cnt[p]||0)+1; } });
     const m={}; Object.keys(sum).forEach(p=>{ if(cnt[p]) m[p]=+(sum[p]/cnt[p]).toFixed(1); });
     return m;
-  };
+  }
 
   window.UI={$,esc,num,f0,f2,money,pct,today,dstr,addDays,diffDays,R,setRules,profit,marginColor,tag,dot,
     sevTag,severityOf,card,kpi,table,empty,statBar,alertItem,toast,modal,confirmBox,formFields,formValues,chart,clearCharts,
